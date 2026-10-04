@@ -58,12 +58,13 @@ fn plays_to_the_end() {
     let (_playback, rx, dir) = play("eof", &launch());
     let (progress, last, outcome) = until_end(&rx);
     assert_eq!(outcome, Outcome::Finished);
-    assert_eq!(last.duration, 100.0);
-    assert_eq!(last.position, 100.0);
+    // The stand-in plays 100 s past where it was asked to start.
+    assert_eq!(last.duration, 130.0);
+    assert_eq!(last.position, 130.0);
     assert!(
         progress
             .iter()
-            .any(|p| p.position >= 30.0 && p.duration == 100.0),
+            .any(|p| p.position >= 30.0 && p.duration == 130.0),
         "{progress:?}"
     );
     let args = std::fs::read_to_string(dir.path().join("args")).unwrap();

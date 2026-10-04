@@ -326,6 +326,13 @@ impl LibraryItem {
     }
 }
 
+/// The time now as Stremio's apps write it: to the millisecond.
+pub fn now() -> Timestamp {
+    Timestamp::now()
+        .round(jiff::Unit::Millisecond)
+        .expect("rounding the present to the millisecond stays in range")
+}
+
 /// The titles in Continue watching: latest first, at most 100.
 pub fn continue_watching(items: &[LibraryItem]) -> Vec<&LibraryItem> {
     let mut items: Vec<&LibraryItem> = items.iter().filter(|i| i.in_continue_watching()).collect();
@@ -576,6 +583,13 @@ mod tests {
             .map(|i| i.id.as_str())
             .collect();
         assert_eq!(ids, ["new", "old"]);
+    }
+
+    #[test]
+    fn now_is_to_the_millisecond() {
+        let json = serde_json::to_string(&now()).unwrap();
+        let fraction = json.trim_matches('"').split('.').nth(1).unwrap_or("Z");
+        assert!(fraction.len() <= 4, "{json}");
     }
 
     #[test]

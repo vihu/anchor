@@ -55,7 +55,8 @@ if end == "error":
     conn.close()
     sys.exit(2)
 
-change("duration", 100.0)
+duration = start + 100.0
+change("duration", duration)
 change("pause", False)
 for step in range(5):
     change("time-pos", start + step)
@@ -66,7 +67,7 @@ if end == "quit":
         pass
     send({"event": "end-file", "reason": "quit"})
 else:
-    change("time-pos", 100.0)
+    change("time-pos", duration)
     send({"event": "end-file", "reason": "eof"})
 conn.close()
 os.unlink(path)

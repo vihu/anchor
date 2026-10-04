@@ -173,6 +173,43 @@ impl Session {
         })
     }
 
+    /// The hero's Resume: the title's page with the streams of the episode
+    /// (or movie) the user is at.
+    pub(super) fn play_hero(self: &Rc<Self>) {
+        let Some(preview) = self.home_hero_preview() else {
+            return;
+        };
+        let target = {
+            let state = self.state.borrow();
+            let item = state
+                .home
+                .cards
+                .first()
+                .map(|c| &c.item)
+                .filter(|i| i.id == preview.id);
+            item.and_then(|item| {
+                let video_id = item.state.video_id.clone()?;
+                let episode = text::episode(&video_id).filter(|_| item.kind != "movie");
+                let code = episode.map(|(s, e)| text::code(s, e));
+                let meta = state.metas.get(&item.id);
+                let title = meta.and_then(|m| video_title(m, item)).unwrap_or_default();
+                Some(super::streams::Target {
+                    kind: item.kind.clone(),
+                    meta_id: item.id.clone(),
+                    video_id,
+                    name: item.name.clone(),
+                    label: super::streams::label(code.as_deref(), &title, ""),
+                    code,
+                    picture: state.home.cards.first().and_then(|c| c.image.clone()),
+                })
+            })
+        };
+        self.open_title(preview);
+        if let Some(target) = target {
+            self.open_streams(target, super::streams::Start::Resume, None);
+        }
+    }
+
     /// A title's metadata arrived (fetched for Home, a page, a search):
     /// Home's cards and hero take what they need from it.
     pub(super) fn home_meta_ready(&self, meta: &MetaItem) {

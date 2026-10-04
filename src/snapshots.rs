@@ -21,7 +21,7 @@ use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferTyp
 use slint::platform::{EventLoopProxy, Key, Platform, WindowAdapter, WindowEvent};
 use slint::{ComponentHandle, PhysicalSize, PlatformError, Rgb8Pixel, SharedString};
 
-use crate::ui::{AppWindow, SearchData, Shell};
+use crate::ui::{AppWindow, NowPlaying, SearchData, Shell};
 
 /// The window's size, as designed.
 const SIZE: (u32, u32) = (1440, 900);
@@ -201,6 +201,33 @@ fn steps() -> Vec<Step> {
             action: |app| {
                 app.invoke_back();
                 app.invoke_home_open_card(1);
+            },
+        },
+        Step {
+            name: "streams",
+            wait: Duration::from_secs(2),
+            action: |app| {
+                app.invoke_back();
+                app.invoke_home_play_hero();
+            },
+        },
+        Step {
+            name: "playing",
+            wait: Duration::from_secs(2),
+            action: |app| press(app, Key::Return),
+        },
+        Step {
+            name: "stopped",
+            wait: Duration::from_secs(2),
+            action: |app| app.global::<NowPlaying>().invoke_stop(),
+        },
+        Step {
+            name: "streams-movie",
+            wait: Duration::from_secs(2),
+            action: |app| {
+                app.invoke_back();
+                app.invoke_home_open_card(1);
+                app.invoke_title_play();
             },
         },
         Step {

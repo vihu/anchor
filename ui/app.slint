@@ -11,9 +11,9 @@ import { NowPlaying } from "nowplaying.slint";
 import { HomeScreen } from "home.slint";
 import { CatalogScreen } from "catalog.slint";
 import { TitleScreen } from "title.slint";
-import { CardItem, CatalogLink, EpisodeItem, HeroItem, PosterItem, RowItem, SeasonItem, SectionItem, TitleDetails } from "models.slint";
+import { CardItem, CatalogLink, EpisodeItem, HeroItem, PosterItem, RowItem, SeasonItem, SectionItem, StreamItem, TitleDetails } from "models.slint";
 
-export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, EpisodeItem, HeroItem, PosterItem, RowItem, SearchItem, SeasonItem, SectionItem, TitleDetails }
+export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, EpisodeItem, HeroItem, PosterItem, RowItem, SearchItem, SeasonItem, SectionItem, StreamItem, TitleDetails }
 
 export enum Screen { login, home, catalog, search, title, settings }
 
@@ -66,6 +66,25 @@ export component AppWindow inherits Window {
     callback title-restart <=> title.restart;
     callback title-toggle-watched <=> title.toggle-watched;
     callback title-season-selected <=> title.season-selected;
+    // Its streams panel, and mpv playing it.
+    in-out property <bool> streams-open;
+    in property <string> streams-subtitle;
+    in property <[StreamItem]> streams;
+    in-out property <int> stream-index;
+    in property <string> streams-note;
+    in property <string> streams-banner;
+    in property <bool> title-playing;
+    callback play-stream <=> title.play-stream;
+    callback close-streams <=> title.close-streams;
+
+    // Scrolls the streams panel to the selected stream.
+    public function reveal-stream() {
+        title.reveal-stream();
+    }
+
+    // A note at the foot of the window, for example "Saved to your Stremio
+    // account"; empty for none.
+    in property <string> toast;
 
     // Scrolls a series' page to the selected season and episode.
     public function reveal-episode() {
@@ -195,6 +214,13 @@ export component AppWindow inherits Window {
                 season-index: root.title-season-index;
                 episodes: root.title-episodes;
                 episode-index <=> root.title-episode-index;
+                streams-open <=> root.streams-open;
+                streams-subtitle: root.streams-subtitle;
+                streams: root.streams;
+                stream-index <=> root.stream-index;
+                streams-note: root.streams-note;
+                streams-banner: root.streams-banner;
+                playing: root.title-playing;
                 back => {
                     root.back();
                 }
@@ -218,6 +244,39 @@ export component AppWindow inherits Window {
             error: root.login-error;
             busy: root.login-busy;
             posters: root.login-posters;
+        }
+    }
+
+    if root.toast != "": Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - 28px;
+        width: toast-row.preferred-width;
+        height: 44px;
+        border-radius: Theme.radius-md;
+        background: Theme.surface-3;
+        drop-shadow-blur: 28px;
+        drop-shadow-offset-y: 10px;
+        drop-shadow-color: #00000073;
+        toast-row := HorizontalLayout {
+            padding-left: 14px;
+            padding-right: 16px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: @image-url("icons/check.svg");
+                    width: 16px;
+                    height: 16px;
+                    colorize: Theme.ok;
+                }
+            }
+            Text {
+                text: root.toast;
+                color: Theme.text;
+                font-size: Theme.fs-sm;
+                font-weight: 500;
+                vertical-alignment: center;
+            }
         }
     }
 }

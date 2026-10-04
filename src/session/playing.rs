@@ -1,0 +1,391 @@
+//! What mpv is playing: its position, the library item it moves (with
+//! Stremio's rules, seeks apart), the now-playing pill and bar, and the
+//! end: progress written back, the next episode pointed at, or the panel
+//! again when mpv could not play the stream.
+
+use std::rc::Rc;
+use std::time::{Duration, Instant};
+
+use anchor::addon::{MetaItem, MetaPreview};
+use anchor::library::{self, LibraryItem};
+use anchor::player::{Event, Outcome, Playback, Progress};
+use slint::{ComponentHandle, SharedString, TimerMode};
+
+use super::streams::Target;
+use super::{Session, with_session};
+use crate::art::Size;
+use crate::text;
+use crate::ui::NowPlaying;
+
+/// How often progress is written to the account while mpv plays.
+const PUSH_EVERY: Duration = Duration::from_secs(30);
+/// Beyond the time that passed, a jump forward this large is a seek.
+const SEEK_SLACK: f64 = 3.0;
+/// How long a note stays at the foot of the window.
+const TOAST_TIME: Duration = Duration::from_secs(5);
+
+/// A title playing in mpv.
+pub(super) struct Playing {
+    token: u64,
+    playback: Playback,
+    target: Target,
+    /// Where mpv was asked to start, in seconds.
+    start: Option<f64>,
+    /// The last position mpv reported, and when.
+    last: Progress,
+    last_at: Instant,
+    pushed_at: Instant,
+    /// mpv reported a length: the stream plays.
+    started: bool,
+}
+
+impl Playing {
+    /// The playback `token` names, started on `target`.
+    pub(super) fn new(token: u64, playback: Playback, target: Target, start: Option<f64>) -> Self {
+        Self {
+            token,
+            playback,
+            target,
+            start,
+            last: Progress::default(),
+            last_at: Instant::now(),
+            pushed_at: Instant::now(),
+            started: false,
+        }
+    }
+
+    /// Asks mpv to quit.
+    pub(super) fn stop(&self) {
+        self.playback.stop();
+    }
+
+    /// The video playing.
+    pub(super) fn video_id(&self) -> &str {
+        &self.target.video_id
+    }
+}
+
+impl Session {
+    /// A token for the next playback, so events of an earlier one are told
+    /// apart.
+    pub(super) fn next_token(&self) -> u64 {
+        let mut state = self.state.borrow_mut();
+        state.tokens += 1;
+        state.tokens
+    }
+
+    /// mpv started: the pill, the bar, and the page say so.
+    pub(super) fn start_playing(self: &Rc<Self>, playing: Playing) {
+        let target = playing.target.clone();
+        let label = target.code.clone().unwrap_or_else(|| target.name.clone());
+        self.state.borrow_mut().playing = Some(playing);
+        if let Some(app) = self.app.upgrade() {
+            let now = app.global::<NowPlaying>();
+            now.set_active(true);
+            now.set_label(label.into());
+            now.set_title(
+                match &target.code {
+                    Some(_) => {
+                        format!("{} · {}", target.name, target.label.replacen(" · ", " ", 1))
+                    }
+                    None => target.name.clone(),
+                }
+                .into(),
+            );
+            now.set_stream(SharedString::new());
+            now.set_time("Starting…".into());
+            now.set_progress(0.0);
+            now.set_has_still(false);
+        }
+        if let Some(url) = &target.picture {
+            self.art.borrow_mut().request(url, Size::Still);
+        }
+        if let Some(stream) = self.paths.last_streams().get(&target.video_id)
+            && let Some(app) = self.app.upgrade()
+        {
+            let name = stream.name.replace('\n', " ");
+            app.global::<NowPlaying>().set_stream(name.into());
+        }
+        self.show_playing();
+    }
+
+    /// The pill: the playing title's page.
+    pub(super) fn open_playing(self: &Rc<Self>) {
+        let target = self
+            .state
+            .borrow()
+            .playing
+            .as_ref()
+            .map(|p| p.target.clone());
+        if let Some(target) = target {
+            self.open_title(MetaPreview {
+                id: target.meta_id,
+                kind: target.kind,
+                name: target.name,
+                ..MetaPreview::default()
+            });
+        }
+    }
+
+    /// The bar's Stop: quits mpv.
+    pub(super) fn stop_playing(&self) {
+        if let Some(playing) = self.state.borrow().playing.as_ref() {
+            playing.stop();
+        }
+    }
+
+    /// Something happened to the mpv of playback `token`.
+    pub(super) fn player_event(self: &Rc<Self>, token: u64, event: Event) {
+        if self.state.borrow().playing.as_ref().map(|p| p.token) != Some(token) {
+            return;
+        }
+        match event {
+            Event::Progress(progress) => self.progress(progress),
+            Event::Ended(last, outcome) => self.ended(last, outcome),
+        }
+    }
+
+    /// A picture for the now-playing bar arrived.
+    pub(super) fn playing_art_ready(&self, url: &str, image: &slint::Image) {
+        let wanted = self
+            .state
+            .borrow()
+            .playing
+            .as_ref()
+            .and_then(|p| p.target.picture.clone());
+        if wanted.as_deref() == Some(url)
+            && let Some(app) = self.app.upgrade()
+        {
+            let now = app.global::<NowPlaying>();
+            now.set_still(image.clone());
+            now.set_has_still(true);
+        }
+    }
+
+    /// The window closes: the position mpv reached is written to the
+    /// account before anchor exits. mpv itself keeps playing.
+    pub(super) fn finish_playing(&self) {
+        let Some(playing) = self.state.borrow_mut().playing.take() else {
+            return;
+        };
+        if !playing.started {
+            return;
+        }
+        let item = self.apply_progress(&playing, playing.last);
+        if let (Some(item), Some((key, _))) = (item, self.key())
+            && let Err(e) = self.api.put_library(&key, &[item])
+        {
+            eprintln!("library: {e}");
+        }
+    }
+
+    /// Shows a note at the foot of the window for a few seconds.
+    pub(super) fn toast(&self, text: &str) {
+        if let Some(app) = self.app.upgrade() {
+            app.set_toast(text.into());
+        }
+        self.toast_timer
+            .start(TimerMode::SingleShot, TOAST_TIME, || {
+                with_session(|s| {
+                    if let Some(app) = s.app.upgrade() {
+                        app.set_toast(SharedString::new());
+                    }
+                });
+            });
+    }
+}
+
+// Private
+impl Session {
+    fn progress(self: &Rc<Self>, progress: Progress) {
+        let push = {
+            let mut state = self.state.borrow_mut();
+            let Some(playing) = state.playing.as_mut() else {
+                return;
+            };
+            let paused_changed = playing.last.paused != progress.paused;
+            playing.started |= progress.duration > 0.0;
+            let push =
+                playing.started && (playing.pushed_at.elapsed() >= PUSH_EVERY || paused_changed);
+            if push {
+                playing.pushed_at = Instant::now();
+            }
+            push
+        };
+        let item = {
+            let state = self.state.borrow();
+            let playing = state.playing.as_ref().expect("checked above");
+            if playing.started {
+                self.apply_progress(playing, progress)
+            } else {
+                None
+            }
+        };
+        {
+            let mut state = self.state.borrow_mut();
+            if let Some(playing) = state.playing.as_mut() {
+                playing.last = progress;
+                playing.last_at = Instant::now();
+            }
+        }
+        if let Some(item) = item {
+            self.keep_item(item, push);
+        }
+        if let Some(app) = self.app.upgrade() {
+            let now = app.global::<NowPlaying>();
+            let label = self
+                .state
+                .borrow()
+                .playing
+                .as_ref()
+                .map(|p| {
+                    p.target
+                        .code
+                        .clone()
+                        .unwrap_or_else(|| p.target.name.clone())
+                })
+                .unwrap_or_default();
+            now.set_label(format!("{label} · {}", text::clock(progress.position)).into());
+            if progress.duration > 0.0 {
+                now.set_time(
+                    format!(
+                        "{} / {}{}",
+                        text::clock(progress.position),
+                        text::clock(progress.duration),
+                        if progress.paused { " · paused" } else { "" }
+                    )
+                    .into(),
+                );
+                now.set_progress((progress.position / progress.duration).clamp(0.0, 1.0) as f32);
+            }
+        }
+    }
+
+    fn ended(self: &Rc<Self>, last: Progress, outcome: Outcome) {
+        let Some(playing) = self.state.borrow_mut().playing.take() else {
+            return;
+        };
+        if let Some(app) = self.app.upgrade() {
+            app.global::<NowPlaying>().set_active(false);
+        }
+        let target = playing.target.clone();
+        if let Outcome::Failed(why) = &outcome
+            && !playing.started
+        {
+            self.show_playing();
+            self.stream_failed(target, why);
+            return;
+        }
+        if playing.started {
+            let finished = outcome == Outcome::Finished;
+            let last = if finished {
+                Progress {
+                    position: last.duration,
+                    ..last
+                }
+            } else {
+                last
+            };
+            if let Some(mut item) = self.apply_progress(&playing, last) {
+                let next = self.next_video(&target);
+                item.stopped(next.as_deref(), library::now());
+                self.keep_item(item, true);
+            }
+            let what = target.code.clone().unwrap_or_else(|| target.name.clone());
+            self.toast(&if finished {
+                format!("Finished {what} · saved to your Stremio account")
+            } else {
+                format!(
+                    "Saved to your Stremio account · {what} at {}",
+                    text::clock(last.position)
+                )
+            });
+        }
+        self.show_playing();
+        self.refresh_home();
+    }
+
+    /// The library item after `progress`: a seek moves the resume point, a
+    /// stretch of playing counts as watched; `None` before mpv reports a
+    /// length.
+    fn apply_progress(&self, playing: &Playing, progress: Progress) -> Option<LibraryItem> {
+        if progress.duration <= 0.0 {
+            return None;
+        }
+        let state = self.state.borrow();
+        let now = library::now();
+        let target = &playing.target;
+        let meta = state.metas.get(&target.meta_id);
+        let mut item = state
+            .library
+            .iter()
+            .find(|i| i.id == target.meta_id)
+            .cloned()
+            .or_else(|| meta.map(|m| LibraryItem::new(&m.preview, now)))?;
+        let (time, duration) = (millis(progress.position), millis(progress.duration));
+        let ids = meta.map(MetaItem::bitfield_ids).unwrap_or_default();
+        let elapsed = playing.last_at.elapsed().as_secs_f64();
+        let jumped = if playing.started && playing.last.duration > 0.0 {
+            let moved = progress.position - playing.last.position;
+            moved > elapsed + SEEK_SLACK || moved < -1.0
+        } else {
+            // The first report: where mpv was asked to start is no seek.
+            playing
+                .start
+                .is_some_and(|start| (progress.position - start).abs() > SEEK_SLACK)
+        };
+        if jumped {
+            item.seek(time, duration, now);
+        } else {
+            item.time_changed(&target.video_id, time, duration, &ids, now);
+        }
+        Some(item)
+    }
+
+    /// Keeps `item` in the library; `push` writes it to the account too.
+    fn keep_item(&self, item: LibraryItem, push: bool) {
+        if push {
+            self.save_item(item);
+        } else {
+            let mut state = self.state.borrow_mut();
+            match state.library.iter_mut().find(|i| i.id == item.id) {
+                Some(slot) => *slot = item,
+                None => state.library.push(item),
+            }
+        }
+    }
+
+    /// The episode after `target`'s, as Stremio picks it.
+    fn next_video(&self, target: &Target) -> Option<String> {
+        let state = self.state.borrow();
+        let meta = state.metas.get(&target.meta_id)?;
+        meta.next_video(&target.video_id, library::now())
+            .map(|v| v.id.clone())
+    }
+
+    /// The title page and its episode list say whether mpv plays them.
+    fn show_playing(&self) {
+        let Some(app) = self.app.upgrade() else {
+            return;
+        };
+        let playing = self
+            .state
+            .borrow()
+            .playing
+            .as_ref()
+            .map(|p| p.target.meta_id.clone());
+        let page = self.state.borrow().page.as_ref().map(|p| p.id().to_owned());
+        let here = playing.is_some() && playing == page;
+        let mut details = app.get_title_details();
+        details.playing = here;
+        app.set_title_details(details);
+        app.set_title_playing(here);
+        self.refresh_page();
+        self.refresh_episodes();
+    }
+}
+
+/// Seconds as Stremio's milliseconds.
+fn millis(seconds: f64) -> u64 {
+    (seconds.max(0.0) * 1000.0).round() as u64
+}

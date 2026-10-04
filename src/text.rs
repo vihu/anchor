@@ -42,6 +42,17 @@ pub fn runtime(text: &str) -> String {
     length(minutes * MINUTE_MS)
 }
 
+/// A position as a player shows it, for example `31:10` or `1:02:03`.
+pub fn clock(seconds: f64) -> String {
+    let total = seconds.max(0.0).round() as u64;
+    let (h, m, s) = (total / 3600, total / 60 % 60, total % 60);
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
+}
+
 /// Season and episode from a video id such as `tt0903747:2:4`.
 pub fn episode(video_id: &str) -> Option<(u32, u32)> {
     let mut parts = video_id.rsplit(':');
@@ -98,6 +109,14 @@ mod tests {
         assert_eq!(runtime("1h"), "1 h");
         assert_eq!(runtime("45"), "45 min");
         assert_eq!(runtime("about an hour"), "about an hour");
+    }
+
+    #[test]
+    fn clock_times() {
+        assert_eq!(clock(1870.4), "31:10");
+        assert_eq!(clock(3723.0), "1:02:03");
+        assert_eq!(clock(5.0), "0:05");
+        assert_eq!(clock(-3.0), "0:00");
     }
 
     #[test]

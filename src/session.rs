@@ -9,8 +9,10 @@
 mod account;
 mod catalog;
 mod home;
+mod playing;
 mod search;
 mod shell;
+mod streams;
 mod title;
 
 use std::cell::RefCell;
@@ -27,7 +29,7 @@ use anchor::store::{Account, Paths};
 use slint::{ComponentHandle, Image, Model, Timer, VecModel};
 
 use crate::art::{Art, Picture, Size};
-use crate::ui::{AppWindow, Screen, SearchData, Shell};
+use crate::ui::{AppWindow, NowPlaying, Screen, SearchData, Shell};
 
 thread_local! {
     static SESSION: RefCell<Option<Rc<Session>>> = const { RefCell::new(None) };
@@ -43,6 +45,7 @@ pub struct Session {
     state: RefCell<State>,
     art: RefCell<Art>,
     search_timer: Timer,
+    toast_timer: Timer,
 }
 
 /// What the session knows.
@@ -62,6 +65,10 @@ struct State {
     browse: catalog::Browse,
     search: search::Search,
     page: Option<title::Page>,
+    panel: streams::Panel,
+    playing: Option<playing::Playing>,
+    /// Source of playback tokens.
+    tokens: u64,
     /// Titles' metadata fetched so far, and those on their way.
     metas: home::Metas,
     fetching: HashSet<String>,
@@ -86,6 +93,7 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
         state: RefCell::default(),
         art: RefCell::new(art),
         search_timer: Timer::default(),
+        toast_timer: Timer::default(),
     });
     SESSION.with(|s| *s.borrow_mut() = Some(Rc::clone(&session)));
 
@@ -108,13 +116,20 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
     app.on_catalog_items_visible(|first, count| {
         with_session(|s| s.catalog_items_visible(first, count));
     });
-    app.on_home_play_hero(|| with_session(|s| s.open_with(Session::home_hero_preview)));
+    app.on_home_play_hero(|| with_session(|s| s.play_hero()));
     app.on_home_open_hero(|| with_session(|s| s.open_with(Session::home_hero_preview)));
     app.on_home_open_card(|i| with_session(|s| s.open_with(|s| s.home_card_preview(i))));
     app.on_home_open_title(|r, i| with_session(|s| s.open_with(|s| s.home_row_preview(r, i))));
     app.on_catalog_open(|i| with_session(|s| s.open_with(|s| s.catalog_preview(i))));
     app.on_title_season_selected(|i| with_session(|s| s.title_season_selected(i)));
     app.on_title_toggle_watched(|| with_session(|s| s.title_toggle_watched()));
+    app.on_title_play(|| with_session(|s| s.title_play(streams::Start::Resume)));
+    app.on_title_restart(|| with_session(|s| s.title_play(streams::Start::Beginning)));
+    app.on_play_stream(|i| with_session(|s| s.play_stream(i)));
+    app.on_close_streams(|| with_session(|s| s.close_streams()));
+    let now = app.global::<NowPlaying>();
+    now.on_open(|| with_session(|s| s.open_playing()));
+    now.on_stop(|| with_session(|s| s.stop_playing()));
     let search = app.global::<SearchData>();
     search.on_picked(|i| with_session(|s| s.open_with(|s| s.search_preview(i))));
     search.on_edited(|_| with_session(|s| s.search_edited()));
@@ -125,8 +140,11 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
     session.open_saved();
 }
 
-/// Saves what is left to save before the window closes.
-pub fn finish() {}
+/// Saves what is left to save before the window closes: the position of
+/// the title playing.
+pub fn finish() {
+    with_session(|s| s.finish_playing());
+}
 
 /// Runs `f` with the session, if the window still has one.
 fn with_session(f: impl FnOnce(&Rc<Session>)) {
@@ -198,6 +216,9 @@ impl Session {
             }
         }
         self.home_art_ready(&url, size, &image);
+        if size == Size::Still {
+            self.playing_art_ready(&url, &image);
+        }
         self.page_art_ready(&url, size, &image);
         if size == Size::Poster {
             self.catalog_art_ready(&url, &image);

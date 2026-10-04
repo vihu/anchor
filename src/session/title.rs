@@ -5,10 +5,11 @@
 use std::rc::Rc;
 
 use anchor::addon::{MetaItem, MetaPreview, Video};
-use anchor::library::LibraryItem;
+use anchor::library::{self, LibraryItem};
 use jiff::Timestamp;
 use slint::{Image, Model, ModelRc, SharedString, VecModel};
 
+use super::streams::{Target, label};
 use super::{Session, State};
 use crate::art::Size;
 use crate::text;
@@ -32,7 +33,62 @@ pub(super) struct Page {
     backdrop: Option<String>,
 }
 
+impl Page {
+    /// The title's id.
+    pub(super) fn id(&self) -> &str {
+        &self.preview.id
+    }
+
+    /// What Play plays: the movie, or episode `episode` of the season
+    /// showing; `None` before a series' episodes are known, or for one not
+    /// out yet.
+    pub(super) fn target(&self, episode: i32, now: Timestamp) -> Option<Target> {
+        let preview = self.meta.as_ref().map_or(&self.preview, |m| &m.preview);
+        let year = text::year(preview.release_info.as_deref());
+        if self.seasons.is_empty() {
+            let video_id = self
+                .meta
+                .as_ref()
+                .map_or_else(|| self.preview.id.clone(), MetaItem::movie_video_id);
+            return Some(Target {
+                kind: preview.kind.clone(),
+                meta_id: preview.id.clone(),
+                video_id,
+                name: preview.name.clone(),
+                code: None,
+                label: year,
+                picture: preview
+                    .background
+                    .clone()
+                    .or_else(|| preview.poster.clone()),
+            });
+        }
+        let video = self.episodes.get(usize::try_from(episode).ok()?)?;
+        if !released(video, now) {
+            return None;
+        }
+        let code = text::code(video.season.unwrap_or(0), video.episode.unwrap_or(0));
+        Some(Target {
+            kind: preview.kind.clone(),
+            meta_id: preview.id.clone(),
+            video_id: video.id.clone(),
+            name: preview.name.clone(),
+            label: label(Some(&code), video.title(), &year),
+            code: Some(code),
+            picture: video
+                .thumbnail
+                .clone()
+                .or_else(|| preview.background.clone()),
+        })
+    }
+}
+
 impl Session {
+    /// The episode list again: watched marks, progress, what plays.
+    pub(super) fn refresh_episodes(&self) {
+        self.show_season(false);
+    }
+
     /// Opens the page of `preview`, which may be all a catalog knows; its
     /// metadata follows.
     pub(super) fn open_title(self: &Rc<Self>, preview: MetaPreview) {
@@ -137,7 +193,7 @@ impl Session {
         let Some(app) = self.app.upgrade() else {
             return;
         };
-        let now = Timestamp::now();
+        let now = library::now();
         let item = {
             let state = self.state.borrow();
             let Some(page) = state.page.as_ref() else {
@@ -292,10 +348,11 @@ impl Session {
         let Some(app) = self.app.upgrade() else {
             return;
         };
-        let now = Timestamp::now();
+        let now = library::now();
         let (tabs, season, model, pick, stills) = {
             let mut state = self.state.borrow_mut();
             let library = state.library.clone();
+            let state_playing = state.playing.as_ref().map(|p| p.video_id().to_owned());
             let Some(page) = state.page.as_mut() else {
                 return;
             };
@@ -304,6 +361,7 @@ impl Session {
             };
             let item = library.iter().find(|i| i.id == meta.preview.id);
             let watched = item.map(|i| i.watched_videos(meta.bitfield_ids()));
+            let playing_video = state_playing.clone();
             let shown: Vec<Video> = meta
                 .display_videos()
                 .into_iter()
@@ -330,7 +388,15 @@ impl Session {
                 .collect();
             let items: Vec<EpisodeItem> = shown
                 .iter()
-                .map(|v| episode_item(v, item, watched.as_ref().is_some_and(|w| w.get(&v.id)), now))
+                .map(|v| {
+                    let mut episode =
+                        episode_item(v, item, watched.as_ref().is_some_and(|w| w.get(&v.id)), now);
+                    if playing_video.as_deref() == Some(v.id.as_str()) {
+                        episode.playing = true;
+                        episode.state = "Playing in mpv".into();
+                    }
+                    episode
+                })
                 .collect();
             let pick = next_episode(&shown, item, watched.as_ref(), now);
             let stills: Vec<String> = shown.iter().filter_map(|v| v.thumbnail.clone()).collect();

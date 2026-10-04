@@ -5,7 +5,9 @@
 import { ListView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
 import { Button, ButtonKind, Hint } from "atoms.slint";
-import { EpisodeItem, SeasonItem, TitleDetails } from "models.slint";
+import { EpisodeItem, SeasonItem, StreamItem, TitleDetails } from "models.slint";
+import { StreamsPanel } from "streams.slint";
+import { NowBar, NowPlaying } from "nowplaying.slint";
 
 component SeasonTab inherits Rectangle {
     in property <SeasonItem> item;
@@ -155,6 +157,18 @@ export component TitleScreen inherits Rectangle {
     in property <int> season-index;
     in property <[EpisodeItem]> episodes;
     in-out property <int> episode-index;
+    // The streams panel: open, its rows, the selected one, a note while it
+    // loads, and a banner when playing failed.
+    in-out property <bool> streams-open;
+    in property <string> streams-subtitle;
+    in property <[StreamItem]> streams;
+    in-out property <int> stream-index;
+    in property <string> streams-note;
+    in property <string> streams-banner;
+    // This title is playing in mpv: the bar at the foot shows it.
+    in property <bool> playing;
+    callback play-stream(int);
+    callback close-streams();
     callback play();
     callback restart();
     callback toggle-watched();
@@ -164,6 +178,11 @@ export component TitleScreen inherits Rectangle {
 
     public function focus-keys() {
         keys.focus();
+    }
+
+    // Scrolls the streams panel to the selected stream.
+    public function reveal-stream() {
+        panel.reveal(root.stream-index);
     }
 
     // Scrolls the episodes so the selected one is visible; rows are 118px.
@@ -199,6 +218,18 @@ export component TitleScreen inherits Rectangle {
         }
     }
 
+    // Moves the stream selection, skipping the addons' headings.
+    function select-stream(step: int) {
+        let a = root.stream-index + step;
+        let b = a + step;
+        let target = a >= 0 && a < root.streams.length && !root.streams[a].heading ? a
+            : b >= 0 && b < root.streams.length && !root.streams[b].heading ? b : -1;
+        if (target >= 0) {
+            root.stream-index = target;
+            panel.reveal(target);
+        }
+    }
+
     function select-season(index: int) {
         if (index >= 0 && index < root.seasons.length && index != root.season-index) {
             root.season-selected(index);
@@ -209,6 +240,20 @@ export component TitleScreen inherits Rectangle {
     keys := FocusScope {
         key-pressed(event) => {
             let key = event.text.to-lowercase();
+            if (root.streams-open) {
+                if (event.text == Key.UpArrow) {
+                    root.select-stream(-1);
+                } else if (event.text == Key.DownArrow) {
+                    root.select-stream(1);
+                } else if (event.text == Key.Return) {
+                    root.play-stream(root.stream-index);
+                } else if (event.text == Key.Escape || event.text == Key.Backspace) {
+                    root.close-streams();
+                } else {
+                    return reject;
+                }
+                return accept;
+            }
             if (event.text == Key.Return || key == " ") {
                 root.play();
             } else if (key == "b" && root.can-restart) {
@@ -454,7 +499,7 @@ export component TitleScreen inherits Rectangle {
                     }
                 }
             }
-            if root.series: Rectangle {
+            if root.series && !root.playing: Rectangle {
                 height: 44px;
                 Rectangle {
                     y: 0;
@@ -486,6 +531,29 @@ export component TitleScreen inherits Rectangle {
                         label: "Back";
                     }
                 }
+            }
+        }
+        if root.playing: NowBar {
+            y: parent.height - self.height;
+            width: parent.width;
+        }
+        panel := StreamsPanel {
+            visible: root.streams-open;
+            x: parent.width - self.width;
+            height: parent.height;
+            subtitle: root.streams-subtitle;
+            items: root.streams;
+            index: root.stream-index;
+            note: root.streams-note;
+            banner: root.streams-banner;
+            play(i) => {
+                root.stream-index = i;
+                keys.focus();
+                root.play-stream(i);
+            }
+            close => {
+                root.close-streams();
+                keys.focus();
             }
         }
     }
