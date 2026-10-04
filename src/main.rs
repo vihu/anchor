@@ -35,14 +35,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(dir) = snapshots::requested() {
         snapshots::install(dir)?;
     }
-    // Matches the desktop entry, so docks show anchor's icon for the window.
-    slint::set_xdg_app_id(APP_ID)?;
     let client = Client::new();
     let api = match std::env::var(API_VARIABLE) {
         Ok(url) if !url.is_empty() => Api::at(client.clone(), &url),
         _ => Api::new(client.clone()),
     };
     let app = ui::AppWindow::new()?;
+    // Matches the desktop entry, so docks show anchor's icon for the window.
+    // Needs the platform, which the first window creates, and must come
+    // before the window is shown.
+    slint::set_xdg_app_id(APP_ID)?;
     #[cfg(feature = "snapshots")]
     snapshots::attach(&app);
     session::start(&app, Paths::system()?, api, Addons::new(client));
