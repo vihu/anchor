@@ -21,7 +21,7 @@ use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferTyp
 use slint::platform::{EventLoopProxy, Key, Platform, WindowAdapter, WindowEvent};
 use slint::{ComponentHandle, PhysicalSize, PlatformError, Rgb8Pixel, SharedString};
 
-use crate::ui::{AppWindow, Shell};
+use crate::ui::{AppWindow, SearchData, Shell};
 
 /// The window's size, as designed.
 const SIZE: (u32, u32) = (1440, 900);
@@ -149,6 +149,29 @@ fn steps() -> Vec<Step> {
             name: "catalog-series",
             wait: Duration::from_secs(3),
             action: |app| app.global::<Shell>().invoke_open_catalog(1, 1),
+        },
+        Step {
+            name: "search-dropdown",
+            wait: Duration::from_secs(2),
+            action: |app| {
+                app.invoke_focus_search();
+                let search = app.global::<SearchData>();
+                search.set_query("burrow".into());
+                search.invoke_edited("burrow".into());
+            },
+        },
+        Step {
+            name: "search-chosen",
+            wait: Duration::from_millis(500),
+            action: |app| {
+                press(app, Key::DownArrow);
+                press(app, Key::DownArrow);
+            },
+        },
+        Step {
+            name: "search-screen",
+            wait: Duration::from_secs(1),
+            action: |app| app.global::<SearchData>().invoke_all(),
         },
         Step {
             name: "sidebar-folded",

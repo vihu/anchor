@@ -9,6 +9,7 @@
 mod account;
 mod catalog;
 mod home;
+mod search;
 mod shell;
 
 use std::cell::RefCell;
@@ -22,10 +23,10 @@ use anchor::library::LibraryItem;
 use anchor::settings::Settings;
 use anchor::sources::{Section, Sources};
 use anchor::store::{Account, Paths};
-use slint::{ComponentHandle, Image, Model, VecModel};
+use slint::{ComponentHandle, Image, Model, Timer, VecModel};
 
 use crate::art::{Art, Picture, Size};
-use crate::ui::{AppWindow, Screen, Shell};
+use crate::ui::{AppWindow, Screen, SearchData, Shell};
 
 thread_local! {
     static SESSION: RefCell<Option<Rc<Session>>> = const { RefCell::new(None) };
@@ -40,6 +41,7 @@ pub struct Session {
     addons: Addons,
     state: RefCell<State>,
     art: RefCell<Art>,
+    search_timer: Timer,
 }
 
 /// What the session knows.
@@ -57,6 +59,7 @@ struct State {
     wall_images: Rc<VecModel<Image>>,
     home: home::Home,
     browse: catalog::Browse,
+    search: search::Search,
     /// Titles' metadata fetched so far, and those on their way.
     metas: home::Metas,
     fetching: HashSet<String>,
@@ -80,6 +83,7 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
         addons,
         state: RefCell::default(),
         art: RefCell::new(art),
+        search_timer: Timer::default(),
     });
     SESSION.with(|s| *s.borrow_mut() = Some(Rc::clone(&session)));
 
@@ -102,6 +106,10 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
     app.on_catalog_items_visible(|first, count| {
         with_session(|s| s.catalog_items_visible(first, count));
     });
+    let search = app.global::<SearchData>();
+    search.on_edited(|_| with_session(|s| s.search_edited()));
+    search.on_move(|delta| with_session(|s| s.search_move(delta)));
+    search.on_all(|| with_session(|s| s.search_all()));
 
     session.apply_sidebar();
     session.open_saved();
@@ -182,6 +190,7 @@ impl Session {
         self.home_art_ready(&url, size, &image);
         if size == Size::Poster {
             self.catalog_art_ready(&url, &image);
+            self.search_art_ready(&url, &image);
         }
     }
 
