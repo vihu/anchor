@@ -151,6 +151,19 @@ fn steps() -> Vec<Step> {
             action: |app| app.global::<Shell>().invoke_open_catalog(1, 1),
         },
         Step {
+            name: "catalog-next",
+            wait: Duration::from_secs(2),
+            action: |app| {
+                let control = SharedString::from(Key::Control);
+                app.window().dispatch_event(WindowEvent::KeyPressed {
+                    text: control.clone(),
+                });
+                press(app, Key::DownArrow);
+                app.window()
+                    .dispatch_event(WindowEvent::KeyReleased { text: control });
+            },
+        },
+        Step {
             name: "search-dropdown",
             wait: Duration::from_secs(2),
             action: |app| {

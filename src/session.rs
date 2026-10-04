@@ -112,6 +112,7 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
     });
     app.on_sign_out(|| with_session(|s| s.sign_out()));
     app.on_navigate(|i| with_session(|s| s.navigate(i)));
+    app.on_step_catalog(|step| with_session(|s| s.step_catalog(step)));
     app.on_back(|| with_session(|s| s.back()));
     let shell = app.global::<Shell>();
     shell.on_toggle_sidebar(|| with_session(|s| s.toggle_sidebar()));

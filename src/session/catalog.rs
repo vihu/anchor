@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use anchor::addon::MetaPreview;
 use anchor::sources::CatalogRef;
-use slint::{Image, Model, ModelRc, VecModel};
+use slint::{ComponentHandle, Image, Model, ModelRc, VecModel};
 
 use super::home::poster_item;
 use super::{Session, spawn};
@@ -50,6 +50,37 @@ impl Session {
         };
         self.light_catalog(section, catalog);
         self.browse(at, None);
+    }
+
+    /// Ctrl+Up or Ctrl+Down: the catalog before or after the one showing,
+    /// through every section of the sidebar in order.
+    pub(super) fn step_catalog(self: &Rc<Self>, step: i32) {
+        let Some(app) = self.app.upgrade() else {
+            return;
+        };
+        let shell = app.global::<crate::ui::Shell>();
+        let all: Vec<(usize, usize)> = self
+            .state
+            .borrow()
+            .sections
+            .iter()
+            .enumerate()
+            .flat_map(|(s, section)| (0..section.catalogs.len()).map(move |c| (s, c)))
+            .collect();
+        if all.is_empty() {
+            return;
+        }
+        let current = (shell.get_active_section(), shell.get_active_catalog());
+        let at = all
+            .iter()
+            .position(|&(s, c)| (s as i32, c as i32) == current);
+        let next = match at {
+            Some(i) => (i as i32 + step).rem_euclid(all.len() as i32) as usize,
+            None if step < 0 => all.len() - 1,
+            None => 0,
+        };
+        let (s, c) = all[next];
+        self.open_catalog(s as i32, c as i32);
     }
 
     /// "See all" on Home's row `row`.

@@ -102,6 +102,8 @@ export component AppWindow inherits Window {
 
     // The places: 0 Home, 5 the search field, 6 Settings.
     callback navigate(int);
+    // Ctrl+Up or Ctrl+Down: the previous or next catalog of the sidebar.
+    callback step-catalog(int);
     // The top bar's back button.
     in property <string> back-label;
     callback back();
@@ -158,6 +160,18 @@ export component AppWindow inherits Window {
             }
             if (event.modifiers.control && event.text == "," && root.browsing) {
                 root.navigate(6);
+                return accept;
+            }
+            reject
+        }
+        // Ctrl+Up and Ctrl+Down before the screen sees the arrows.
+        capture-key-pressed(event) => {
+            if (event.modifiers.control && event.text == Key.UpArrow && root.browsing) {
+                root.step-catalog(-1);
+                return accept;
+            }
+            if (event.modifiers.control && event.text == Key.DownArrow && root.browsing) {
+                root.step-catalog(1);
                 return accept;
             }
             reject

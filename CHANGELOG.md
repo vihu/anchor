@@ -12,7 +12,7 @@ through your own mpv.
   per catalog of your addons, posters kept only near the screen.
 - The sidebar lists every catalog your addons offer, under Movies, Series
   and any other type; a catalog opens full width, by genre, the next page
-  as you scroll.
+  as you scroll. Ctrl+Up and Ctrl+Down step through the catalogs.
 - Search at the top of every screen, across every catalog that can search,
   with results as you type.
 - Movie and series pages: seasons, episodes, watched marks (Stremio's
