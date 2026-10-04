@@ -1,0 +1,326 @@
+// Titles as cards: a poster with its name, a title left unfinished, and the
+// rows of them on Home. Layout: .ai-docs/mockups/02-home.html.
+
+import { Theme } from "theme.slint";
+import { CardItem, PosterItem } from "models.slint";
+
+// A poster with the title, year and rating under it.
+export component PosterCard inherits Rectangle {
+    in property <PosterItem> item;
+    in property <bool> selected;
+    callback clicked();
+
+    VerticalLayout {
+        spacing: 0px;
+        alignment: start;
+        Rectangle {
+            height: self.width * 1.5;
+            border-radius: Theme.radius-md;
+            clip: true;
+            background: @linear-gradient(180deg, root.item.tint 0%, Theme.surface-1 100%);
+            if !root.item.has-poster: Text {
+                x: 14px;
+                y: parent.height - self.height - 14px;
+                width: parent.width - 28px;
+                text: root.item.title;
+                color: Theme.text;
+                font-size: Theme.fs-lg;
+                font-weight: 800;
+                wrap: word-wrap;
+                overflow: elide;
+                max-height: parent.height - 28px;
+            }
+            if root.item.has-poster: Image {
+                width: 100%;
+                height: 100%;
+                source: root.item.poster;
+                image-fit: cover;
+            }
+            if root.item.progress > 0: Rectangle {
+                x: 10px;
+                y: parent.height - 14px;
+                width: parent.width - 20px;
+                height: 4px;
+                border-radius: 2px;
+                background: #ffffff4d;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * root.item.progress;
+                    border-radius: 2px;
+                    background: Theme.accent;
+                }
+            }
+            if root.item.watched: Rectangle {
+                x: parent.width - self.width - 8px;
+                y: 8px;
+                width: 26px;
+                height: 26px;
+                border-radius: 13px;
+                background: Theme.on-image;
+                Image {
+                    source: @image-url("icons/check.svg");
+                    width: 14px;
+                    height: 14px;
+                    colorize: Theme.text;
+                }
+            }
+            if root.selected || touch.has-hover: Rectangle {
+                border-radius: Theme.radius-md;
+                border-width: root.selected ? 3px : 1px;
+                border-color: root.selected ? Theme.accent : Theme.accent-line;
+            }
+        }
+        Rectangle {
+            height: 10px;
+        }
+        Text {
+            text: root.item.title;
+            color: root.selected ? Theme.accent : Theme.text;
+            font-size: Theme.fs-sm;
+            font-weight: 600;
+            overflow: elide;
+        }
+        HorizontalLayout {
+            spacing: 4px;
+            height: 18px;
+            alignment: start;
+            if root.item.detail != "": Text {
+                text: root.item.detail + (root.item.rating != "" ? " ·" : "");
+                color: Theme.text-3;
+                font-size: Theme.fs-xs;
+                vertical-alignment: center;
+            }
+            if root.item.rating != "": HorizontalLayout {
+                spacing: 3px;
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("icons/star.svg");
+                        width: 11px;
+                        height: 11px;
+                        colorize: Theme.text-3;
+                    }
+                }
+                Text {
+                    text: root.item.rating;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-xs;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// A title left unfinished: a wide picture with how far it was watched.
+export component ContinueCard inherits Rectangle {
+    in property <CardItem> card;
+    in property <bool> selected;
+    callback clicked();
+    width: 300px;
+    VerticalLayout {
+        spacing: 0px;
+        alignment: start;
+        Rectangle {
+            height: 169px;
+            border-radius: Theme.radius-md;
+            clip: true;
+            background: @linear-gradient(160deg, root.card.tint 0%, Theme.surface-1 100%);
+            if root.card.has-image: Image {
+                width: 100%;
+                height: 100%;
+                source: root.card.image;
+                image-fit: cover;
+            }
+            if !root.card.has-image: Text {
+                x: 16px;
+                y: parent.height - self.height - 22px;
+                width: parent.width - 32px;
+                text: root.card.title;
+                color: Theme.text;
+                font-size: Theme.fs-xl;
+                font-weight: 800;
+                wrap: word-wrap;
+            }
+            if root.card.tag != "": Rectangle {
+                x: 10px;
+                y: 10px;
+                width: tag-text.preferred-width + 16px;
+                height: 22px;
+                border-radius: 5px;
+                background: Theme.on-image;
+                tag-text := Text {
+                    text: root.card.tag;
+                    color: Theme.text;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+            }
+            if root.card.progress > 0: Rectangle {
+                x: 12px;
+                y: parent.height - 12px;
+                width: parent.width - 24px;
+                height: 4px;
+                border-radius: 2px;
+                background: #ffffff4d;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * root.card.progress;
+                    border-radius: 2px;
+                    background: Theme.accent;
+                }
+            }
+            if root.selected || touch.has-hover: Rectangle {
+                border-radius: Theme.radius-md;
+                border-width: root.selected ? 3px : 1px;
+                border-color: root.selected ? Theme.accent : Theme.accent-line;
+            }
+        }
+        Text {
+            text: root.card.title;
+            color: root.selected ? Theme.accent : Theme.text;
+            font-size: Theme.fs-md;
+            font-weight: 600;
+            overflow: elide;
+            height: 34px;
+            vertical-alignment: bottom;
+        }
+        HorizontalLayout {
+            alignment: start;
+            spacing: 0px;
+            Text {
+                text: root.card.detail + (root.card.left != "" ? " · " : "");
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                overflow: elide;
+            }
+            if root.card.left != "": Text {
+                text: root.card.left;
+                color: Theme.accent;
+                font-size: Theme.fs-sm;
+                font-weight: 600;
+            }
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// A row's heading: its title, where it comes from, and "See all".
+export component SectionHead inherits HorizontalLayout {
+    in property <string> text;
+    in property <string> source;
+    in property <bool> see-all;
+    callback see-all-clicked();
+    height: 56px;
+    spacing: 12px;
+    padding-right: 48px;
+    Text {
+        text: root.text;
+        color: Theme.text;
+        font-size: Theme.fs-xl;
+        font-weight: 700;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.source;
+        color: Theme.text-3;
+        font-size: Theme.fs-sm;
+        font-weight: 500;
+        vertical-alignment: center;
+        horizontal-stretch: 1;
+    }
+    if root.see-all: Text {
+        text: "See all";
+        color: see-all-touch.has-hover ? Theme.text : Theme.text-3;
+        font-size: Theme.fs-sm;
+        font-weight: 600;
+        vertical-alignment: center;
+        see-all-touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.see-all-clicked();
+            }
+        }
+    }
+}
+
+// A sideways row of posters; scrolls itself to the focused one.
+export component PosterRow inherits Flickable {
+    in property <[PosterItem]> items;
+    // The focused poster; -1 when the row has no focus.
+    in property <int> focused;
+    callback open(int);
+
+    property <length> pitch: 164px + 22px;
+
+    changed focused => {
+        if (root.focused >= 0) {
+            let x = root.focused * root.pitch;
+            if (x < -root.content-x) {
+                root.content-x = -x;
+            } else if (x + 164px > -root.content-x + root.width) {
+                root.content-x = -(x + 164px - root.width);
+            }
+        }
+    }
+
+    height: 246px + 62px;
+    content-width: max(root.width, root.items.length * root.pitch);
+    HorizontalLayout {
+        spacing: 22px;
+        alignment: start;
+        for item[i] in root.items: PosterCard {
+            width: 164px;
+            item: item;
+            selected: i == root.focused;
+            clicked => {
+                root.open(i);
+            }
+        }
+    }
+}
+
+// A sideways row of titles left unfinished.
+export component CardRow inherits Flickable {
+    in property <[CardItem]> cards;
+    in property <int> focused;
+    callback open(int);
+
+    property <length> pitch: 300px + 16px;
+
+    changed focused => {
+        if (root.focused >= 0) {
+            let x = root.focused * root.pitch;
+            if (x < -root.content-x) {
+                root.content-x = -x;
+            } else if (x + 300px > -root.content-x + root.width) {
+                root.content-x = -(x + 300px - root.width);
+            }
+        }
+    }
+
+    height: 169px + 62px;
+    content-width: max(root.width, root.cards.length * root.pitch);
+    HorizontalLayout {
+        spacing: 16px;
+        alignment: start;
+        for card[i] in root.cards: ContinueCard {
+            card: card;
+            selected: i == root.focused;
+            clicked => {
+                root.open(i);
+            }
+        }
+    }
+}

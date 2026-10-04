@@ -148,3 +148,24 @@ export struct AddonItem {
     // For example ["Catalogs", "Metadata"].
     does: [string],
 }
+
+// Home's hero: the title to resume, or the first of the first row.
+export struct HeroItem {
+    // There is something to show.
+    shown: bool,
+    // For example "Continue watching".
+    eyebrow: string,
+    title: string,
+    // For example "S2 E4 · The Pantry Job".
+    meta: string,
+    rating: string,
+    plot: string,
+    // For example "18 min left"; empty when not started.
+    left: string,
+    progress: float,
+    // For example "Resume S2 E4" or "Play".
+    play-label: string,
+    tint: color,
+    backdrop: image,
+    has-backdrop: bool,
+}

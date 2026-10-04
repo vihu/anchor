@@ -32,6 +32,10 @@ const EXTENSIONS: [&str; 6] = ["png", "jpg", "jpeg", "svg", "webp", "gif"];
 pub enum Size {
     /// A grid poster, 2:3.
     Poster,
+    /// A detail page's wide background.
+    Backdrop,
+    /// An episode still or a card's picture, 16:9.
+    Still,
 }
 
 /// A decoded picture, ready to become a Slint image on the UI thread.
@@ -102,6 +106,8 @@ impl Size {
     const fn bounds(self) -> (u32, u32) {
         match self {
             Size::Poster => (320, 480),
+            Size::Backdrop => (1600, 900),
+            Size::Still => (600, 338),
         }
     }
 }

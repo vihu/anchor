@@ -9,9 +9,9 @@ import { Shell } from "sidebar.slint";
 import { SearchData, SearchItem, SearchScreen } from "search.slint";
 import { NowPlaying } from "nowplaying.slint";
 import { HomeScreen } from "home.slint";
-import { CardItem, CatalogLink, PosterItem, RowItem, SectionItem } from "models.slint";
+import { CardItem, CatalogLink, HeroItem, PosterItem, RowItem, SectionItem } from "models.slint";
 
-export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, PosterItem, RowItem, SearchItem, SectionItem }
+export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, HeroItem, PosterItem, RowItem, SearchItem, SectionItem }
 
 export enum Screen { login, home, catalog, search, title, settings }
 
@@ -29,7 +29,16 @@ export component AppWindow inherits Window {
     callback sign-out();
 
     // Home.
+    in property <HeroItem> home-hero;
+    in property <[CardItem]> home-cards;
+    in property <[RowItem]> home-rows;
     in property <string> home-note;
+    callback home-play-hero <=> home.play-hero;
+    callback home-open-hero <=> home.open-hero;
+    callback home-open-card <=> home.open-card;
+    callback home-open-title <=> home.open-title;
+    callback home-see-all <=> home.see-all;
+    callback home-rows-visible <=> home.rows-visible;
 
     // The places: 0 Home, 5 the search field, 6 Settings.
     callback navigate(int);
@@ -113,6 +122,9 @@ export component AppWindow inherits Window {
 
             home := HomeScreen {
                 visible: root.screen == Screen.home;
+                hero: root.home-hero;
+                cards: root.home-cards;
+                rows: root.home-rows;
                 note: root.home-note;
                 navigate(i) => {
                     root.navigate(i);

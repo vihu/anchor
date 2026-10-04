@@ -178,8 +178,27 @@ class Fake:
         self.content = Content(base, posters)
         self.media = media
         self.base = base
-        self.library = {}
+        self.library = {item["_id"]: item for item in self.seed()}
         self.lock = threading.Lock()
+
+    def seed(self):
+        """Two titles left unfinished: an episode and a movie."""
+        def item(meta, video, offset, duration, minutes_ago):
+            when = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - minutes_ago * 60))
+            return {
+                "_id": meta["id"], "name": meta["name"], "type": meta["type"], "poster": meta["poster"],
+                "posterShape": "poster", "removed": False, "temp": False, "_ctime": when, "_mtime": when,
+                "state": {"lastWatched": when, "timeWatched": offset, "timeOffset": offset,
+                          "overallTimeWatched": offset, "timesWatched": 0, "flaggedWatched": 0,
+                          "duration": duration, "video_id": video, "watched": None, "noNotif": False},
+                "behaviorHints": {"defaultVideoId": meta["behaviorHints"]["defaultVideoId"],
+                                  "featuredVideoId": None, "hasScheduledVideos": False},
+            }
+        show, movie = self.content.series[0], self.content.movies[5]
+        return [
+            item(show, f"{show['id']}:2:4", 30 * 60000, 48 * 60000, 10),
+            item(movie, movie["id"], 40 * 60000, 101 * 60000, 60 * 24),
+        ]
 
     def streams(self, vid):
         files = [f"{self.base}/media/{i}/{os.path.basename(f)}" for i, f in enumerate(self.media)]

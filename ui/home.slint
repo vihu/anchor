@@ -1,30 +1,332 @@
-// Home: what the account's addons and library hold.
+// Home: the title to resume, then Continue watching from the library, then
+// a row per catalog of the account's addons.
 // Layout: .ai-docs/mockups/02-home.html.
 
 import { Theme } from "theme.slint";
+import { Button, ButtonKind } from "atoms.slint";
+import { CardItem, HeroItem, RowItem } from "models.slint";
+import { CardRow, PosterRow, SectionHead } from "cards.slint";
 
 export component HomeScreen inherits Rectangle {
+    in property <HeroItem> hero;
+    in property <[CardItem]> cards;
+    in property <[RowItem]> rows;
     // Shown while the account loads, or when it cannot.
     in property <string> note;
+    // The hero's buttons: play (resume), and its page.
+    callback play-hero();
+    callback open-hero();
+    callback open-card(int);
+    // A title, by catalog row and place.
+    callback open-title(int, int);
+    // "See all" on catalog row `r`.
+    callback see-all(int);
+    // Catalog rows `first` to `first + count` are on screen.
+    callback rows-visible(int, int);
     callback navigate(int);
+
+    // The keyboard's place: 0 the hero, 1 Continue watching, 2 and on the
+    // catalog rows; and the column in it.
+    property <int> line: root.hero.shown ? 0 : root.cards.length > 0 ? 1 : 2;
+    property <int> column;
+    property <length> hero-height: root.hero.shown ? 440px : 0px;
+    property <length> cards-height: root.cards.length > 0 ? 56px + 169px + 62px + 20px : 0px;
+    property <length> row-height: 56px + 246px + 62px + 20px;
+    property <length> rows-top: root.hero-height + root.cards-height;
+    property <int> first-row: max(0, floor((-page.content-y - root.rows-top) / root.row-height));
+    property <int> visible-rows: ceil(page.height / root.row-height) + 1;
+
+    changed first-row => {
+        root.rows-visible(root.first-row, root.visible-rows);
+    }
+    changed visible-rows => {
+        root.rows-visible(root.first-row, root.visible-rows);
+    }
 
     public function focus-keys() {
         keys.focus();
+        root.rows-visible(root.first-row, root.visible-rows);
+    }
+
+    // Whether line `l` has anything to focus.
+    function has-line(l: int) -> bool {
+        l == 0 ? root.hero.shown : l == 1 ? root.cards.length > 0 : l - 2 < root.rows.length && root.rows[l - 2].items.length > 0
+    }
+
+    function length-of(l: int) -> int {
+        l == 0 ? 1 : l == 1 ? root.cards.length : root.rows[l - 2].items.length
+    }
+
+    // Moves to the next line with something in it, in direction `step`,
+    // looking up to three lines away.
+    function move-line(step: int) {
+        let a = root.line + step;
+        let b = a + step;
+        let c = b + step;
+        let target = root.usable(a) ? a : root.usable(b) ? b : root.usable(c) ? c : -1;
+        if (target >= 0) {
+            root.line = target;
+            root.column = min(root.column, root.length-of(target) - 1);
+            root.reveal-line();
+        }
+    }
+
+    function usable(l: int) -> bool {
+        l >= 0 && l < root.rows.length + 2 && root.has-line(l)
+    }
+
+    function reveal-line() {
+        let top = root.line == 0 ? 0px : root.line == 1 ? root.hero-height : root.rows-top + (root.line - 2) * root.row-height;
+        let bottom = root.line == 0 ? root.hero-height : root.line == 1 ? root.rows-top : top + root.row-height;
+        if (top < -page.content-y || root.line == 0) {
+            page.content-y = -top;
+        } else if (bottom > -page.content-y + page.height) {
+            page.content-y = -(bottom - page.height);
+        }
+    }
+
+    function enter() {
+        if (root.line == 0) {
+            root.play-hero();
+        } else if (root.line == 1) {
+            root.open-card(root.column);
+        } else {
+            root.open-title(root.line - 2, root.column);
+        }
     }
 
     background: Theme.bg;
     keys := FocusScope {
         key-pressed(event) => {
-            if (event.text == "/" || (event.modifiers.control && event.text.to-lowercase() == "k")) {
+            let key = event.text.to-lowercase();
+            if (event.text == Key.UpArrow) {
+                root.move-line(-1);
+            } else if (event.text == Key.DownArrow) {
+                root.move-line(1);
+            } else if (event.text == Key.LeftArrow) {
+                root.column = max(0, root.column - 1);
+            } else if (event.text == Key.RightArrow) {
+                root.column = min(root.length-of(root.line) - 1, root.column + 1);
+            } else if (event.text == Key.Return) {
+                root.enter();
+            } else if (key == "i" && root.line == 0) {
+                root.open-hero();
+            } else if (event.text == "/" || (event.modifiers.control && key == "k")) {
                 root.navigate(5);
-                return accept;
+            } else {
+                return reject;
             }
-            reject
+            accept
         }
     }
-    Text {
-        text: root.note;
-        color: Theme.text-3;
-        font-size: Theme.fs-md;
+    page := Flickable {
+        content-height: body.preferred-height;
+        body := VerticalLayout {
+            width: page.width;
+            padding-bottom: 40px;
+            if root.hero.shown: Rectangle {
+                height: root.hero-height;
+                clip: true;
+                if root.hero.has-backdrop: Rectangle {
+                    x: parent.width * 0.26;
+                    width: parent.width * 0.74;
+                    Image {
+                        width: 100%;
+                        height: 100%;
+                        source: root.hero.backdrop;
+                        image-fit: cover;
+                    }
+                    Rectangle {
+                        background: @linear-gradient(90deg, Theme.bg 0%, #0b0c10d6 22%, #0b0c1000 58%);
+                    }
+                    Rectangle {
+                        background: @linear-gradient(0deg, Theme.bg 0%, #0b0c1000 38%);
+                    }
+                }
+                VerticalLayout {
+                    x: 48px;
+                    y: 0;
+                    width: min(580px, parent.width - 96px);
+                    height: parent.height - 36px;
+                    alignment: end;
+                    spacing: 0px;
+                    Text {
+                        text: root.hero.eyebrow;
+                        color: Theme.text-3;
+                        font-size: Theme.fs-sm;
+                        font-weight: 600;
+                    }
+                    Rectangle {
+                        height: 10px;
+                    }
+                    Text {
+                        text: root.hero.title;
+                        color: Theme.text;
+                        font-size: Theme.fs-4xl;
+                        font-weight: 800;
+                        overflow: elide;
+                    }
+                    Rectangle {
+                        height: 12px;
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        spacing: 10px;
+                        if root.hero.meta != "": Text {
+                            text: root.hero.meta;
+                            color: Theme.text-2;
+                            font-size: Theme.fs-md;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                        }
+                        if root.hero.rating != "": HorizontalLayout {
+                            spacing: 5px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("icons/star.svg");
+                                    width: 15px;
+                                    height: 15px;
+                                    colorize: Theme.accent;
+                                }
+                            }
+                            Text {
+                                text: root.hero.rating;
+                                color: Theme.text;
+                                font-size: Theme.fs-md;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                    if root.hero.left != "": HorizontalLayout {
+                        padding-top: 16px;
+                        spacing: 12px;
+                        alignment: start;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 320px;
+                                height: 4px;
+                                border-radius: 2px;
+                                background: #ffffff29;
+                                Rectangle {
+                                    x: 0;
+                                    width: parent.width * root.hero.progress;
+                                    border-radius: 2px;
+                                    background: Theme.accent;
+                                }
+                            }
+                        }
+                        Text {
+                            text: root.hero.left;
+                            color: Theme.text-3;
+                            font-size: Theme.fs-sm;
+                        }
+                    }
+                    Rectangle {
+                        height: 16px;
+                    }
+                    Text {
+                        text: root.hero.plot;
+                        color: Theme.text-2;
+                        font-size: Theme.fs-md;
+                        wrap: word-wrap;
+                        overflow: elide;
+                        max-height: 66px;
+                    }
+                    Rectangle {
+                        height: 22px;
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        alignment: start;
+                        Button {
+                            kind: ButtonKind.primary;
+                            text: root.hero.play-label;
+                            hint: "Enter";
+                            icon: @image-url("icons/play.svg");
+                            has-icon: true;
+                            clicked => {
+                                root.play-hero();
+                            }
+                        }
+                        Button {
+                            text: "Details";
+                            hint: "I";
+                            icon: @image-url("icons/info.svg");
+                            has-icon: true;
+                            clicked => {
+                                root.open-hero();
+                            }
+                        }
+                    }
+                }
+                if root.line == 0 && keys.has-focus: Rectangle {
+                    x: 36px;
+                    y: parent.height - 6px;
+                    width: 40px;
+                    height: 3px;
+                    border-radius: 1.5px;
+                    background: Theme.accent;
+                }
+            }
+            if root.note != "": HorizontalLayout {
+                padding: 48px;
+                Text {
+                    text: root.note;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-md;
+                    wrap: word-wrap;
+                }
+            }
+            if root.cards.length > 0: VerticalLayout {
+                height: root.cards-height;
+                padding-left: 48px;
+                SectionHead {
+                    text: "Continue watching";
+                    source: "Stremio library";
+                }
+                CardRow {
+                    cards: root.cards;
+                    focused: root.line == 1 && keys.has-focus ? root.column : -1;
+                    open(i) => {
+                        root.line = 1;
+                        root.column = i;
+                        keys.focus();
+                        root.open-card(i);
+                    }
+                }
+            }
+            for row[r] in root.rows: VerticalLayout {
+                height: root.row-height;
+                padding-left: 48px;
+                SectionHead {
+                    text: row.title;
+                    source: row.source;
+                    see-all: true;
+                    see-all-clicked => {
+                        root.see-all(r);
+                    }
+                }
+                if row.note != "": Text {
+                    height: 246px + 62px;
+                    text: row.note;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-sm;
+                    vertical-alignment: top;
+                }
+                if row.note == "": PosterRow {
+                    items: row.items;
+                    focused: root.line == r + 2 && keys.has-focus ? root.column : -1;
+                    open(i) => {
+                        root.line = r + 2;
+                        root.column = i;
+                        keys.focus();
+                        root.open-title(r, i);
+                    }
+                }
+            }
+        }
     }
 }

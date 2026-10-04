@@ -202,7 +202,7 @@ impl Session {
     }
 
     /// Takes `addons` and `library` as the account's.
-    fn apply(&self, addons: Vec<Addon>, library: Vec<LibraryItem>) {
+    fn apply(self: &Rc<Self>, addons: Vec<Addon>, library: Vec<LibraryItem>) {
         let sources = Sources::new(addons);
         {
             let mut state = self.state.borrow_mut();
@@ -211,6 +211,7 @@ impl Session {
             state.library = library;
         }
         self.apply_sidebar();
+        self.refresh_home();
     }
 
     fn cache(&self, addons: &[Addon], library: &[LibraryItem]) {

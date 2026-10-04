@@ -9,6 +9,7 @@ mod art;
 mod session;
 #[cfg(feature = "snapshots")]
 mod snapshots;
+mod text;
 
 // The compiled Slint UI, from the `anchor-ui` crate.
 use anchor_ui as ui;

@@ -7,13 +7,15 @@
 //! or shown.
 
 mod account;
+mod home;
 mod shell;
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::thread;
 
-use anchor::addon::Addons;
+use anchor::addon::{Addons, MetaItem};
 use anchor::api::Api;
 use anchor::library::LibraryItem;
 use anchor::settings::Settings;
@@ -52,6 +54,10 @@ struct State {
     /// The sign-in screen's posters, by URL, in the wall's order.
     wall: Vec<String>,
     wall_images: Rc<VecModel<Image>>,
+    home: home::Home,
+    /// Titles' metadata fetched so far, and those on their way.
+    metas: home::Metas,
+    fetching: HashSet<String>,
 }
 
 /// Wires `app` to a new session and opens the saved account, or the
@@ -88,6 +94,7 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
     shell.on_toggle_sidebar(|| with_session(|s| s.toggle_sidebar()));
     shell.on_fold(|i| with_session(|s| s.fold(i)));
     shell.on_open_catalog(|s, c| with_session(|session| session.open_catalog(s, c)));
+    app.on_home_rows_visible(|first, count| with_session(|s| s.home_rows_visible(first, count)));
 
     session.apply_sidebar();
     session.open_saved();
@@ -157,13 +164,62 @@ impl Session {
         let Some(image) = picture.and_then(Picture::image) else {
             return;
         };
-        let state = self.state.borrow();
         if size == Size::Poster {
+            let state = self.state.borrow();
             for (i, wall_url) in state.wall.iter().enumerate() {
                 if *wall_url == url && i < state.wall_images.row_count() {
                     state.wall_images.set_row_data(i, image.clone());
                 }
             }
         }
+        self.home_art_ready(&url, size, &image);
+    }
+
+    /// Fetches the metadata of title `id` of type `kind` from the first addon
+    /// that answers it, unless it is known or on its way.
+    fn fetch_meta(self: &Rc<Self>, kind: &str, id: &str) {
+        let addons: Vec<_> = {
+            let mut state = self.state.borrow_mut();
+            if state.metas.contains_key(id) || !state.fetching.insert(id.to_owned()) {
+                return;
+            }
+            state
+                .sources
+                .serving("meta", kind, id)
+                .into_iter()
+                .cloned()
+                .collect()
+        };
+        let client = self.addons.clone();
+        let (kind, id) = (kind.to_owned(), id.to_owned());
+        let asked = id.clone();
+        spawn(
+            move || {
+                let mut last = None;
+                for addon in &addons {
+                    match client.meta(addon, &kind, &id) {
+                        Ok(meta) => return Ok(meta),
+                        Err(e) => last = Some(e),
+                    }
+                }
+                Err(last.map_or_else(|| "no addon has this title".to_owned(), |e| e.to_string()))
+            },
+            move |s, result: Result<MetaItem, String>| {
+                s.state.borrow_mut().fetching.remove(&asked);
+                match result {
+                    Ok(meta) => s.meta_ready(meta),
+                    Err(e) => eprintln!("metadata: {e}"),
+                }
+            },
+        );
+    }
+
+    /// A title's metadata arrived: kept, and handed to the screens.
+    fn meta_ready(&self, meta: MetaItem) {
+        self.state
+            .borrow_mut()
+            .metas
+            .insert(meta.preview.id.clone(), meta.clone());
+        self.home_meta_ready(&meta);
     }
 }

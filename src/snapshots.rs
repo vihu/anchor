@@ -18,8 +18,8 @@ use std::time::{Duration, Instant};
 
 use camino::Utf8PathBuf;
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
-use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
-use slint::{ComponentHandle, PhysicalSize, PlatformError, Rgb8Pixel};
+use slint::platform::{EventLoopProxy, Key, Platform, WindowAdapter, WindowEvent};
+use slint::{ComponentHandle, PhysicalSize, PlatformError, Rgb8Pixel, SharedString};
 
 use crate::ui::{AppWindow, Shell};
 
@@ -113,6 +113,17 @@ fn steps() -> Vec<Step> {
                 app.set_login_email(EMAIL.into());
                 app.set_login_password(PASSWORD.into());
                 app.invoke_login();
+            },
+        },
+        Step {
+            name: "home-rows",
+            wait: Duration::from_secs(2),
+            action: |app| {
+                for _ in 0..3 {
+                    press(app, Key::DownArrow);
+                }
+                press(app, Key::RightArrow);
+                press(app, Key::RightArrow);
             },
         },
         Step {
@@ -210,6 +221,15 @@ impl EventLoopProxy for Proxy {
         self.jobs.lock().expect("no job panics").push_back(event);
         Ok(())
     }
+}
+
+/// Presses and releases `key` in the window.
+fn press(app: &AppWindow, key: Key) {
+    let text = SharedString::from(key);
+    app.window()
+        .dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
+    app.window()
+        .dispatch_event(WindowEvent::KeyReleased { text });
 }
 
 fn with_app(action: fn(&AppWindow)) {
