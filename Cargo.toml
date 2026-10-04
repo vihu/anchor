@@ -16,20 +16,25 @@ slint-build = "1.18.1"
 
 [dependencies]
 # The window, compiled from `ui/` in a crate of its own.
-anchor-ui   = { path = "ui" }
-camino      = "1.2"
-directories = "6"
+anchor-ui        = { path = "ui" }
+camino           = "1.2"
+directories      = "6"
+# Stremio's dates: RFC 3339 timestamps.
+jiff             = "0.2.37"
 # Secret Service on Linux, Keychain on macOS.
-keyring     = "4.2.0"
-serde       = { version = "1", features = ["derive"] }
-serde_json  = "1"
+keyring          = "4.2.0"
+# Resource paths, as stremio-core encodes them.
+percent-encoding = "2.3"
+serde            = { version = "1", features = ["derive"] }
+serde_json       = "1"
 # The user's extra mpv arguments, split as a shell would.
-shlex       = "1.3"
-slint       = { workspace = true }
+shlex            = "1.3"
+slint            = { workspace = true }
+ureq             = { version = "3.4.2", default-features = false, features = ["gzip", "json", "rustls"] }
 # The cache's size on disk.
-walkdir     = "2.5"
+walkdir          = "2.5"
 # Finds mpv on the PATH.
-which       = "8"
+which            = "8"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"

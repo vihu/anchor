@@ -1,0 +1,352 @@
+{
+ "metas": [
+  {
+   "imdb_id": "tt6933238",
+   "cast": [
+    "Annabelle Wallis",
+    "Shailene Woodley",
+    "Jacob Tremblay"
+   ],
+   "country": "United States",
+   "description": "A Harvard student becomes the Unabomber after psychological experiments. Years later, an FBI agent's pursuit reveals how his past shaped his deadly campaign that killed 3 and injured 23 from 1978-1995.",
+   "director": [
+    "Janus Metz"
+   ],
+   "genre": [
+    "Biography",
+    "Crime",
+    "Drama"
+   ],
+   "imdbRating": "",
+   "name": "Unabomber",
+   "released": "2026-09-25T00:00:00.000Z",
+   "slug": "movie/unabomber-6933238",
+   "type": "movie",
+   "writer": [
+    "Sam Chalsen",
+    "Nelson Greaves"
+   ],
+   "year": "2026",
+   "moviedb_id": 1492640,
+   "popularities": {
+    "moviedb": 129.6464,
+    "stremio": 5.93083,
+    "stremio_lib": 0,
+    "trakt": 1447
+   },
+   "background": "https://images.metahub.space/background/medium/tt6933238/img",
+   "logo": "https://images.metahub.space/logo/medium/tt6933238/img",
+   "poster": "https://images.metahub.space/poster/small/tt6933238/img",
+   "runtime": "101 min",
+   "trailers": [
+    {
+     "source": "B3tR6qQjbgI",
+     "type": "Trailer"
+    }
+   ],
+   "popularity": 5.93083,
+   "id": "tt6933238",
+   "genres": [
+    "Biography",
+    "Crime",
+    "Drama"
+   ],
+   "releaseInfo": "2026",
+   "trailerStreams": [
+    {
+     "title": "Unabomber",
+     "ytId": "B3tR6qQjbgI"
+    }
+   ],
+   "links": [
+    {
+     "name": "Unabomber",
+     "category": "share",
+     "url": "https://www.strem.io/s/movie/unabomber-6933238"
+    },
+    {
+     "name": "Biography",
+     "category": "Genres",
+     "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Biography"
+    },
+    {
+     "name": "Crime",
+     "category": "Genres",
+     "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Crime"
+    },
+    {
+     "name": "Drama",
+     "category": "Genres",
+     "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Drama"
+    },
+    {
+     "name": "Annabelle Wallis",
+     "category": "Cast",
+     "url": "stremio:///search?search=Annabelle%20Wallis"
+    },
+    {
+     "name": "Shailene Woodley",
+     "category": "Cast",
+     "url": "stremio:///search?search=Shailene%20Woodley"
+    },
+    {
+     "name": "Jacob Tremblay",
+     "category": "Cast",
+     "url": "stremio:///search?search=Jacob%20Tremblay"
+    },
+    {
+     "name": "Sam Chalsen",
+     "category": "Writers",
+     "url": "stremio:///search?search=Sam%20Chalsen"
+    },
+    {
+     "name": "Nelson Greaves",
+     "category": "Writers",
+     "url": "stremio:///search?search=Nelson%20Greaves"
+    },
+    {
+     "name": "Janus Metz",
+     "category": "Directors",
+     "url": "stremio:///search?search=Janus%20Metz"
+    }
+   ],
+   "behaviorHints": {
+    "defaultVideoId": "tt6933238",
+    "hasScheduledVideos": false
+   }
+  },
+  {
+   "imdb_id": "tt22526100",
+   "name": "The Love Hypothesis",
+   "popularities": {
+    "trakt": 1213,
+    "moviedb": 205.4903,
+    "stremio": 6.849676666666666,
+    "stremio_lib": 0
+   },
+   "type": "movie",
+   "cast": [
+    "Lili Reinhart",
+    "Tom Bateman",
+    "Rachel Marsh"
+   ],
+   "country": "United States",
+   "description": "After an impulsive kiss, two scientists end up in a fake relationship, testing their theories about love and each other.",
+   "director": [
+    "Claire Scanlon"
+   ],
+   "genre": [
+    "Comedy",
+    "Romance"
+   ],
+   "imdbRating": "",
+   "released": "2026-09-23T00:00:00.000Z",
+   "slug": "movie/the-love-hypothesis-22526100",
+   "writer": [
+    "Ali Hazelwood",
+    "Sarah Rothschild"
+   ],
+   "year": "2026",
+   "moviedb_id": 1032863,
+   "poster": "https://images.metahub.space/poster/small/tt22526100/img",
+   "runtime": "112 min",
+   "trailers": [
+    {
+     "source": "xwdamnfS6IM",
+     "type": "Trailer"
+    }
+   ],
+   "background": "https://images.metahub.space/background/medium/tt22526100/img",
+   "logo": "https://images.metahub.space/logo/medium/tt22526100/img",
+   "popularity": 6.849676666666666,
+   "id": "tt22526100",
+   "genres": [
+    "Comedy",
+    "Romance"
+   ],
+   "releaseInfo": "2026",
+   "trailerStreams": [
+    {
+     "title": "The Love Hypothesis",
+     "ytId": "xwdamnfS6IM"
+    }
+   ],
+   "links": [
+    {
+     "name": "The Love Hypothesis",
+     "category": "share",
+     "url": "https://www.strem.io/s/movie/the-love-hypothesis-22526100"
+    },
+    {
+     "name": "Comedy",
+     "category": "Genres",
+     "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Comedy"
+    },
+    {
+     "name": "Romance",
+     "category": "Genres",
+     "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Romance"
+    },
+    {
+     "name": "Lili Reinhart",
+     "category": "Cast",
+     "url": "stremio:///search?search=Lili%20Reinhart"
+    },
+    {
+     "name": "Tom Bateman",
+     "category": "Cast",
+     "url": "stremio:///search?search=Tom%20Bateman"
+    },
+    {
+     "name": "Rachel Marsh",
+     "category": "Cast",
+     "url": "stremio:///search?search=Rachel%20Marsh"
+    },
+    {
+     "name": "Ali Hazelwood",
+     "category": "Writers",
+     "url": "stremio:///search?search=Ali%20Hazelwood"
+    },
+    {
+     "name": "Sarah Rothschild",
+     "category": "Writers",
+     "url": "stremio:///search?search=Sarah%20Rothschild"
+    },
+    {
+     "name": "Claire Scanlon",
+     "category": "Directors",
+     "url": "stremio:///search?search=Claire%20Scanlon"
+    }
+   ],
+   "behaviorHints": {
+    "defaultVideoId": "tt22526100",
+    "hasScheduledVideos": false
+   }
+  },
+  {
+   "imdb_id": "tt26657236",
+   "name": "Backrooms",
+   "popularities": {
+    "trakt": 602,
+    "moviedb": 102.7942,
+    "stremio": 3.4264733333333335,
+    "stremio_lib": 0
+   },
+   "type": "movie",
+   "cast": [
+    "Chiwetel Ejiofor",
+    "Renate Reinsve",
+    "Mark Duplass"
+   ],
+   "country": "United States, Canada",
+   "description": "After a therapist's patient disappears into a dimension beyond reality, she must venture into the unknown to save him.",
+   "director": [
+    "Kane Parsons"
+   ],
+   "genre": [
+    "Horror",
+    "Sci-Fi",
+    "Thriller"
+   ],
+   "imdbRating": "6.8",
+   "released": "2026-05-29T00:00:00.000Z",
+   "slug": "movie/backrooms-26657236",
+   "writer": [
+    "Will Soodik",
+    "Kane Parsons"
+   ],
+   "year": "2026",
+   "moviedb_id": 1083381,
+   "poster": "https://images.metahub.space/poster/small/tt26657236/img",
+   "runtime": "111 min",
+   "trailers": [
+    {
+     "source": "0HjdiohVOik",
+     "type": "Trailer"
+    }
+   ],
+   "background": "https://images.metahub.space/background/medium/tt26657236/img",
+   "logo": "https://images.metahub.space/logo/medium/tt26657236/img",
+   "awards": "14 nominations total",
+   "popularity": 3.4264733333333335,
+   "id": "tt26657236",
+   "genres": [
+    "Horror",
+    "Sci-Fi",
+    "Thriller"
+   ],
+   "releaseInfo": "2026",
+   "trailerStreams": [
+    {
+     "title": "Backrooms",
+     "ytId": "0HjdiohVOik"
+    }
+   ],
+   "links": [
+    {
+     "name": "6.8",
+     "category": "imdb",
+     "url": "https://imdb.com/title/tt26657236"
+    },
+    {
+     "name": "Backrooms",
+     "category": "share",
+     "url": "https://www.strem.io/s/movie/backrooms-26657236"
+    },
+    {
+     "name": "Horror",
+     "category": "Genres",
+     "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Horror"
+    },
+    {
+     "name": "Sci-Fi",
+     "category": "Genres",
+     "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Sci-Fi"
+    },
+    {
+     "name": "Thriller",
+     "category": "Genres",
+     "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Thriller"
+    },
+    {
+     "name": "Chiwetel Ejiofor",
+     "category": "Cast",
+     "url": "stremio:///search?search=Chiwetel%20Ejiofor"
+    },
+    {
+     "name": "Renate Reinsve",
+     "category": "Cast",
+     "url": "stremio:///search?search=Renate%20Reinsve"
+    },
+    {
+     "name": "Mark Duplass",
+     "category": "Cast",
+     "url": "stremio:///search?search=Mark%20Duplass"
+    },
+    {
+     "name": "Will Soodik",
+     "category": "Writers",
+     "url": "stremio:///search?search=Will%20Soodik"
+    },
+    {
+     "name": "Kane Parsons",
+     "category": "Writers",
+     "url": "stremio:///search?search=Kane%20Parsons"
+    },
+    {
+     "name": "Kane Parsons",
+     "category": "Directors",
+     "url": "stremio:///search?search=Kane%20Parsons"
+    }
+   ],
+   "behaviorHints": {
+    "defaultVideoId": "tt26657236",
+    "hasScheduledVideos": false
+   }
+  }
+ ],
+ "hasMore": true,
+ "cacheMaxAge": 14400,
+ "staleRevalidate": 3600,
+ "staleError": 3600
+}
