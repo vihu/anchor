@@ -17,10 +17,13 @@ slint-build = "1.18.1"
 [dependencies]
 # The window, compiled from `ui/` in a crate of its own.
 anchor-ui        = { path = "ui" }
+# Stremio's watched bitfield: base64 of zlib.
+base64           = "0.23.1"
 camino           = "1.2"
 directories      = "6"
+flate2           = "1.1"
 # Stremio's dates: RFC 3339 timestamps.
-jiff             = "0.2.37"
+jiff             = { version = "0.2.37", features = ["serde"] }
 # Secret Service on Linux, Keychain on macOS.
 keyring          = "4.2.0"
 # Resource paths, as stremio-core encodes them.

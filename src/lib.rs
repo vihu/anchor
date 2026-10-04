@@ -6,7 +6,9 @@
 #![deny(unsafe_code, missing_docs, rustdoc::broken_intra_doc_links)]
 
 pub mod addon;
+pub mod library;
 pub mod net;
 pub mod player;
 pub mod settings;
 pub mod store;
+pub mod watched;

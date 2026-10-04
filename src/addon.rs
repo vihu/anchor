@@ -188,6 +188,15 @@ pub struct MetaHints {
     /// The video a movie (or a title with one video) plays.
     #[serde(default)]
     pub default_video_id: Option<String>,
+    /// The video to feature, when the title has one.
+    #[serde(default)]
+    pub featured_video_id: Option<String>,
+    /// More videos are coming, for example a series still airing.
+    #[serde(default)]
+    pub has_scheduled_videos: bool,
+    /// A live channel.
+    #[serde(default)]
+    pub is_live: bool,
 }
 
 /// A title with everything about it: its videos too.

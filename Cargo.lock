@@ -176,8 +176,10 @@ name = "anchor"
 version = "0.1.0"
 dependencies = [
  "anchor-ui",
+ "base64",
  "camino",
  "directories",
+ "flate2",
  "jiff",
  "keyring",
  "percent-encoding",
