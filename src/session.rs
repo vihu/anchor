@@ -11,6 +11,7 @@ mod catalog;
 mod home;
 mod search;
 mod shell;
+mod title;
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -60,6 +61,7 @@ struct State {
     home: home::Home,
     browse: catalog::Browse,
     search: search::Search,
+    page: Option<title::Page>,
     /// Titles' metadata fetched so far, and those on their way.
     metas: home::Metas,
     fetching: HashSet<String>,
@@ -106,7 +108,15 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
     app.on_catalog_items_visible(|first, count| {
         with_session(|s| s.catalog_items_visible(first, count));
     });
+    app.on_home_play_hero(|| with_session(|s| s.open_with(Session::home_hero_preview)));
+    app.on_home_open_hero(|| with_session(|s| s.open_with(Session::home_hero_preview)));
+    app.on_home_open_card(|i| with_session(|s| s.open_with(|s| s.home_card_preview(i))));
+    app.on_home_open_title(|r, i| with_session(|s| s.open_with(|s| s.home_row_preview(r, i))));
+    app.on_catalog_open(|i| with_session(|s| s.open_with(|s| s.catalog_preview(i))));
+    app.on_title_season_selected(|i| with_session(|s| s.title_season_selected(i)));
+    app.on_title_toggle_watched(|| with_session(|s| s.title_toggle_watched()));
     let search = app.global::<SearchData>();
+    search.on_picked(|i| with_session(|s| s.open_with(|s| s.search_preview(i))));
     search.on_edited(|_| with_session(|s| s.search_edited()));
     search.on_move(|delta| with_session(|s| s.search_move(delta)));
     search.on_all(|| with_session(|s| s.search_all()));
@@ -188,6 +198,7 @@ impl Session {
             }
         }
         self.home_art_ready(&url, size, &image);
+        self.page_art_ready(&url, size, &image);
         if size == Size::Poster {
             self.catalog_art_ready(&url, &image);
             self.search_art_ready(&url, &image);
@@ -233,12 +244,20 @@ impl Session {
         );
     }
 
+    /// Opens the page of the title `pick` names, if it names one.
+    fn open_with(self: &Rc<Self>, pick: impl FnOnce(&Self) -> Option<anchor::addon::MetaPreview>) {
+        if let Some(preview) = pick(self) {
+            self.open_title(preview);
+        }
+    }
+
     /// A title's metadata arrived: kept, and handed to the screens.
-    fn meta_ready(&self, meta: MetaItem) {
+    fn meta_ready(self: &Rc<Self>, meta: MetaItem) {
         self.state
             .borrow_mut()
             .metas
             .insert(meta.preview.id.clone(), meta.clone());
         self.home_meta_ready(&meta);
+        self.page_meta_ready(&meta);
     }
 }

@@ -10,9 +10,10 @@ import { SearchData, SearchItem, SearchScreen } from "search.slint";
 import { NowPlaying } from "nowplaying.slint";
 import { HomeScreen } from "home.slint";
 import { CatalogScreen } from "catalog.slint";
-import { CardItem, CatalogLink, HeroItem, PosterItem, RowItem, SectionItem } from "models.slint";
+import { TitleScreen } from "title.slint";
+import { CardItem, CatalogLink, EpisodeItem, HeroItem, PosterItem, RowItem, SeasonItem, SectionItem, TitleDetails } from "models.slint";
 
-export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, HeroItem, PosterItem, RowItem, SearchItem, SectionItem }
+export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, EpisodeItem, HeroItem, PosterItem, RowItem, SearchItem, SeasonItem, SectionItem, TitleDetails }
 
 export enum Screen { login, home, catalog, search, title, settings }
 
@@ -54,6 +55,23 @@ export component AppWindow inherits Window {
     callback catalog-open <=> catalog.open;
     callback catalog-items-visible <=> catalog.items-visible;
 
+    // A title's page.
+    in property <TitleDetails> title-details;
+    in property <bool> title-series;
+    in property <[SeasonItem]> title-seasons;
+    in property <int> title-season-index;
+    in property <[EpisodeItem]> title-episodes;
+    in-out property <int> title-episode-index;
+    callback title-play <=> title.play;
+    callback title-restart <=> title.restart;
+    callback title-toggle-watched <=> title.toggle-watched;
+    callback title-season-selected <=> title.season-selected;
+
+    // Scrolls a series' page to the selected season and episode.
+    public function reveal-episode() {
+        title.reveal-episode();
+    }
+
     // Scrolls a catalog's grid back to the top.
     public function rewind-catalog() {
         catalog.rewind();
@@ -73,6 +91,8 @@ export component AppWindow inherits Window {
             browse.focus-search(false);
         } else if (root.screen == Screen.catalog) {
             catalog.focus-keys();
+        } else if (root.screen == Screen.title) {
+            title.focus-keys();
         } else {
             home.focus-keys();
         }
@@ -162,6 +182,22 @@ export component AppWindow inherits Window {
                 index <=> root.catalog-index;
                 note: root.catalog-note;
                 loading-more: root.catalog-loading-more;
+                navigate(i) => {
+                    root.navigate(i);
+                }
+            }
+
+            title := TitleScreen {
+                visible: root.screen == Screen.title;
+                details: root.title-details;
+                series: root.title-series;
+                seasons: root.title-seasons;
+                season-index: root.title-season-index;
+                episodes: root.title-episodes;
+                episode-index <=> root.title-episode-index;
+                back => {
+                    root.back();
+                }
                 navigate(i) => {
                     root.navigate(i);
                 }

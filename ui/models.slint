@@ -104,6 +104,10 @@ export struct SeasonItem {
 // An episode in a series' list.
 export struct EpisodeItem {
     number: string,
+    // For example "S2 E4".
+    code: string,
+    // When resumable, for example "18 min left".
+    left: string,
     title: string,
     plot: string,
     // For example "47 min", "Out Sun 12 Oct", "18 min left" or "Watched".

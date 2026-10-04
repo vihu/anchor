@@ -74,6 +74,14 @@ impl Session {
         }
     }
 
+    /// The title result row `row` shows, if it is one.
+    pub(super) fn search_preview(&self, row: i32) -> Option<MetaPreview> {
+        let state = self.state.borrow();
+        let search = &state.search;
+        let (catalog, i) = (*search.rows.get(usize::try_from(row).ok()?)?)?;
+        search.answers.get(catalog)?.1.as_ref()?.get(i).cloned()
+    }
+
     /// A poster for the results arrived.
     pub(super) fn search_art_ready(&self, url: &str, image: &Image) {
         let state = self.state.borrow();

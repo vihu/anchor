@@ -174,6 +174,36 @@ fn steps() -> Vec<Step> {
             action: |app| app.global::<SearchData>().invoke_all(),
         },
         Step {
+            name: "title-series",
+            wait: Duration::from_secs(3),
+            action: |app| app.invoke_home_open_card(0),
+        },
+        Step {
+            name: "title-episode-watched",
+            wait: Duration::from_secs(1),
+            action: |app| {
+                press(app, Key::UpArrow);
+                press(app, Key::UpArrow);
+                press(app, Key::UpArrow);
+                press(app, Key::UpArrow);
+                press(app, Key::UpArrow);
+                press_text(app, "w");
+            },
+        },
+        Step {
+            name: "title-next-season",
+            wait: Duration::from_secs(2),
+            action: |app| press(app, Key::RightArrow),
+        },
+        Step {
+            name: "title-movie",
+            wait: Duration::from_secs(3),
+            action: |app| {
+                app.invoke_back();
+                app.invoke_home_open_card(1);
+            },
+        },
+        Step {
             name: "sidebar-folded",
             wait: Duration::from_millis(500),
             action: |app| app.global::<Shell>().invoke_toggle_sidebar(),
@@ -272,7 +302,12 @@ impl EventLoopProxy for Proxy {
 
 /// Presses and releases `key` in the window.
 fn press(app: &AppWindow, key: Key) {
-    let text = SharedString::from(key);
+    press_text(app, &SharedString::from(key));
+}
+
+/// Presses and releases the key that types `text`.
+fn press_text(app: &AppWindow, text: &str) {
+    let text = SharedString::from(text);
     app.window()
         .dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
     app.window()

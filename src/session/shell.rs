@@ -112,6 +112,11 @@ impl Session {
 
     /// The top bar's back button.
     pub(super) fn back(self: &Rc<Self>) {
-        self.navigate(HOME);
+        let screen = self.app.upgrade().map(|app| app.get_screen());
+        if screen == Some(Screen::Title) {
+            self.title_back();
+        } else {
+            self.navigate(HOME);
+        }
     }
 }

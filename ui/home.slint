@@ -136,8 +136,10 @@ export component HomeScreen inherits Rectangle {
                         source: root.hero.backdrop;
                         image-fit: cover;
                     }
+                    // Two stops: a stop between them draws a seam in Slint's
+                    // software renderer.
                     Rectangle {
-                        background: @linear-gradient(90deg, Theme.bg 0%, #0b0c10d6 22%, #0b0c1000 58%);
+                        background: @linear-gradient(90deg, Theme.bg 0%, #0b0c1000 60%);
                     }
                     Rectangle {
                         background: @linear-gradient(0deg, Theme.bg 0%, #0b0c1000 38%);

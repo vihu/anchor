@@ -151,6 +151,14 @@ impl Session {
     }
 }
 
+impl Session {
+    /// Title `i` of the grid.
+    pub(super) fn catalog_preview(&self, i: i32) -> Option<MetaPreview> {
+        let state = self.state.borrow();
+        state.browse.metas.get(usize::try_from(i).ok()?).cloned()
+    }
+}
+
 // Private
 impl Session {
     /// Shows catalog `at`, filtered by `genre`, from its first page.

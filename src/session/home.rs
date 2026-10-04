@@ -141,6 +141,38 @@ impl Session {
         }
     }
 
+    /// The title of Continue watching's card `i`, as a catalog would list it.
+    pub(super) fn home_card_preview(&self, i: i32) -> Option<MetaPreview> {
+        let state = self.state.borrow();
+        let item = &state.home.cards.get(usize::try_from(i).ok()?)?.item;
+        Some(MetaPreview {
+            id: item.id.clone(),
+            kind: item.kind.clone(),
+            name: item.name.clone(),
+            poster: item.poster.clone(),
+            ..MetaPreview::default()
+        })
+    }
+
+    /// Title `i` of catalog row `row`.
+    pub(super) fn home_row_preview(&self, row: i32, i: i32) -> Option<MetaPreview> {
+        let state = self.state.borrow();
+        let row = state.home.rows.get(usize::try_from(row).ok()?)?;
+        row.metas.get(usize::try_from(i).ok()?).cloned()
+    }
+
+    /// The hero's title: the first card's, else the first row's first.
+    pub(super) fn home_hero_preview(&self) -> Option<MetaPreview> {
+        self.home_card_preview(0).or_else(|| {
+            let state = self.state.borrow();
+            state
+                .home
+                .rows
+                .iter()
+                .find_map(|r| r.metas.first().cloned())
+        })
+    }
+
     /// A title's metadata arrived (fetched for Home, a page, a search):
     /// Home's cards and hero take what they need from it.
     pub(super) fn home_meta_ready(&self, meta: &MetaItem) {

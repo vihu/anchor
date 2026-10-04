@@ -176,6 +176,30 @@ impl Session {
         );
     }
 
+    /// Records `item` in the library and its cache, and writes it to the
+    /// account in the background.
+    pub(super) fn save_item(&self, item: LibraryItem) {
+        {
+            let mut state = self.state.borrow_mut();
+            match state.library.iter_mut().find(|i| i.id == item.id) {
+                Some(slot) => *slot = item.clone(),
+                None => state.library.push(item.clone()),
+            }
+            if let Err(e) = self.paths.cache(LIBRARY_CACHE, &state.library) {
+                eprintln!("cache: {e}");
+            }
+        }
+        let Some((key, _)) = self.key() else {
+            return;
+        };
+        let api = self.api.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = api.put_library(&key, &[item]) {
+                eprintln!("library: {e}");
+            }
+        });
+    }
+
     /// The signed-in account's email.
     pub(super) fn email(&self) -> String {
         self.state
