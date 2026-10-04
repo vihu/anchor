@@ -6,6 +6,7 @@
 #![deny(unsafe_code, missing_docs, rustdoc::broken_intra_doc_links)]
 
 mod art;
+mod languages;
 mod session;
 #[cfg(feature = "snapshots")]
 mod snapshots;

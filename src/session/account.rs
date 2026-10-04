@@ -158,8 +158,10 @@ impl Session {
                     Ok((addons, library)) => {
                         s.cache(&addons, &library);
                         s.apply(addons, library);
+                        s.state.borrow_mut().synced_at = Some(jiff::Timestamp::now());
                         s.set_meta("synced");
                         s.set_note("");
+                        s.fill_settings();
                     }
                     Err(e) if e.signed_out() => {
                         let email = s.email();

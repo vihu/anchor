@@ -1,0 +1,839 @@
+// Settings: Account, Addons, Player and About, beside the sections column.
+// Layout: .ai-docs/mockups/07-settings.html.
+
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Button, ButtonKind, Hint } from "atoms.slint";
+import { AddonItem, Fact } from "models.slint";
+
+export { AddonItem, Fact }
+
+// What the Settings screen shows and what it asks for; the Rust side fills
+// and answers it.
+export global SettingsData {
+    // Account.
+    in property <string> avatar;
+    in property <string> email;
+    in property <[Fact]> facts;
+    // Addons, in the account's order.
+    in property <[AddonItem]> addons;
+    // Player: where mpv is (empty to look on the PATH), what was found
+    // there, and the extra arguments.
+    in-out property <string> mpv-path;
+    in property <string> mpv-status;
+    in property <bool> mpv-found;
+    in-out property <string> mpv-args;
+    in property <bool> addon-subtitles;
+    // The subtitle languages chosen, and every one to choose from.
+    in property <[string]> languages;
+    in property <[string]> language-options;
+    // About.
+    in property <string> version;
+    // For example "anchor 0.1.0 · 7542fa1 of 4 Oct 2026".
+    in property <string> build;
+    in property <[Fact]> files;
+    in property <bool> clearing;
+    callback sync();
+    callback mpv-path-edited(string);
+    // The path field lost focus or took Enter: mpv is looked for again.
+    callback check-mpv();
+    callback mpv-args-edited(string);
+    callback toggle-subtitles();
+    callback add-language(int);
+    callback remove-language(int);
+    callback open-addons-site();
+    callback open-source();
+    callback clear-cache();
+}
+
+component SectionItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <string> count;
+    in property <bool> selected;
+    callback clicked();
+    height: 40px;
+    border-radius: Theme.radius-sm;
+    background: root.selected ? Theme.accent-soft : touch.has-hover ? Theme.surface-2 : transparent;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                width: 18px;
+                height: 18px;
+                colorize: root.selected ? Theme.accent : Theme.text-2;
+            }
+        }
+        Text {
+            text: root.text;
+            color: root.selected ? Theme.accent : touch.has-hover ? Theme.text : Theme.text-2;
+            font-size: Theme.fs-md;
+            font-weight: 500;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Text {
+            text: root.count;
+            color: root.selected ? Theme.accent : Theme.text-3;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// What a setting is on the left, its control (the children) on the right.
+component SettingRow inherits VerticalLayout {
+    in property <string> title;
+    in property <string> description;
+    HorizontalLayout {
+        padding-top: 16px;
+        padding-bottom: 16px;
+        spacing: 32px;
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: Theme.fs-md;
+                font-weight: 600;
+            }
+            if root.description != "": Text {
+                text: root.description;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                wrap: word-wrap;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            @children
+        }
+    }
+    Rectangle {
+        height: 1px;
+        background: Theme.line;
+    }
+}
+
+component Switch inherits Rectangle {
+    in property <bool> on;
+    callback toggled();
+    width: 44px;
+    height: 26px;
+    border-radius: 13px;
+    background: root.on ? Theme.accent : Theme.surface-4;
+    Rectangle {
+        x: root.on ? 21px : 3px;
+        y: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        background: root.on ? Theme.accent-ink : Theme.text-2;
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.toggled();
+        }
+    }
+}
+
+// A one-line text field.
+component Field inherits Rectangle {
+    in property <string> placeholder;
+    in-out property <string> text;
+    callback edited(string);
+    callback done();
+    width: 320px;
+    height: 40px;
+    border-radius: Theme.radius-md;
+    background: input.has-focus ? Theme.surface-2 : touch.has-hover ? Theme.surface-3 : Theme.surface-2;
+    border-width: input.has-focus ? 2px : 0px;
+    border-color: Theme.accent;
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.text;
+        clicked => {
+            input.focus();
+        }
+    }
+    if root.text == "": Text {
+        x: 14px;
+        width: parent.width - 28px;
+        height: parent.height;
+        text: root.placeholder;
+        color: Theme.text-3;
+        font-size: Theme.fs-sm;
+        vertical-alignment: center;
+    }
+    input := TextInput {
+        x: 14px;
+        width: parent.width - 28px;
+        height: parent.height;
+        text <=> root.text;
+        color: Theme.text;
+        font-size: Theme.fs-sm;
+        vertical-alignment: center;
+        single-line: true;
+        selection-background-color: Theme.accent;
+        selection-foreground-color: Theme.accent-ink;
+        edited => {
+            root.edited(self.text);
+        }
+        accepted => {
+            root.done();
+        }
+        changed has-focus => {
+            if (!self.has-focus) {
+                root.done();
+            }
+        }
+    }
+}
+
+component Tag inherits Rectangle {
+    in property <string> text;
+    height: 22px;
+    width: label.preferred-width + 16px;
+    border-radius: 5px;
+    background: Theme.surface-3;
+    label := Text {
+        text: root.text;
+        color: Theme.text-2;
+        font-size: 11px;
+        font-weight: 600;
+    }
+}
+
+// A section's title and what it is for, and its main button.
+component PanelHeader inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> description;
+    in property <string> action;
+    in property <image> icon;
+    callback clicked();
+    spacing: 24px;
+    padding-bottom: 14px;
+    VerticalLayout {
+        spacing: 4px;
+        horizontal-stretch: 1;
+        Text {
+            text: root.title;
+            color: Theme.text;
+            font-size: Theme.fs-xl;
+            font-weight: 700;
+        }
+        Text {
+            text: root.description;
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            wrap: word-wrap;
+        }
+    }
+    if root.action != "": VerticalLayout {
+        alignment: end;
+        Button {
+            text: root.action;
+            icon: root.icon;
+            has-icon: true;
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+}
+
+component GroupTitle inherits Text {
+    color: Theme.text-3;
+    font-size: Theme.fs-sm;
+    font-weight: 700;
+    height: 52px;
+    vertical-alignment: bottom;
+}
+
+component FactGrid inherits HorizontalLayout {
+    in property <[Fact]> facts;
+    spacing: 24px;
+    padding-top: 20px;
+    padding-bottom: 22px;
+    for fact in root.facts: VerticalLayout {
+        horizontal-stretch: 1;
+        spacing: 3px;
+        Text {
+            text: fact.label;
+            color: Theme.text-3;
+            font-size: Theme.fs-xs;
+            font-weight: 600;
+        }
+        Text {
+            text: fact.value;
+            color: Theme.text;
+            font-size: Theme.fs-sm;
+            font-weight: 500;
+            overflow: elide;
+        }
+    }
+}
+
+component AccountPanel inherits VerticalLayout {
+    callback sign-out();
+    alignment: start;
+    PanelHeader {
+        title: "Account";
+        description: "anchor reads your addons and library from your Stremio account, and writes your watch progress back, so other Stremio apps stay in step.";
+    }
+    HorizontalLayout {
+        spacing: 16px;
+        padding-bottom: 20px;
+        Rectangle {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            background: Theme.surface-4;
+            Text {
+                text: SettingsData.avatar;
+                color: Theme.text;
+                font-size: Theme.fs-lg;
+                font-weight: 700;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            Text {
+                text: SettingsData.email;
+                color: Theme.text;
+                font-size: Theme.fs-lg;
+                font-weight: 600;
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: Theme.ok;
+                    }
+                }
+                Text {
+                    text: "Signed in to Stremio";
+                    color: Theme.text-2;
+                    font-size: Theme.fs-sm;
+                    font-weight: 500;
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 1px;
+        background: Theme.line;
+    }
+    FactGrid {
+        facts: SettingsData.facts;
+    }
+    HorizontalLayout {
+        spacing: 10px;
+        Button {
+            text: "Sync now";
+            icon: @image-url("icons/refresh.svg");
+            has-icon: true;
+            clicked => {
+                SettingsData.sync();
+            }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        Button {
+            kind: ButtonKind.danger;
+            text: "Sign out";
+            icon: @image-url("icons/logout.svg");
+            has-icon: true;
+            clicked => {
+                root.sign-out();
+            }
+        }
+    }
+}
+
+component AddonsPanel inherits VerticalLayout {
+    alignment: start;
+    PanelHeader {
+        title: "Addons";
+        description: "From your Stremio account, in its order: the first addon that can answer a title's details does, and every one that offers streams is asked. Install, remove or configure addons on the Stremio website.";
+        action: "web.stremio.com";
+        icon: @image-url("icons/external.svg");
+        clicked => {
+            SettingsData.open-addons-site();
+        }
+    }
+    for addon in SettingsData.addons: VerticalLayout {
+        HorizontalLayout {
+            padding-top: 16px;
+            padding-bottom: 16px;
+            spacing: 16px;
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                border-radius: 11px;
+                background: addon.tint;
+                Text {
+                    text: addon.short;
+                    color: #fff;
+                    font-size: Theme.fs-sm;
+                    font-weight: 800;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                spacing: 2px;
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    Text {
+                        text: addon.name;
+                        color: Theme.text;
+                        font-size: Theme.fs-md;
+                        font-weight: 600;
+                    }
+                    Text {
+                        text: addon.version;
+                        color: Theme.text-3;
+                        font-size: Theme.fs-sm;
+                        vertical-alignment: center;
+                    }
+                }
+                Text {
+                    text: addon.host;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-sm;
+                    overflow: elide;
+                }
+            }
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: end;
+                for what in addon.does: VerticalLayout {
+                    alignment: center;
+                    Tag {
+                        text: what;
+                    }
+                }
+            }
+        }
+        Rectangle {
+            height: 1px;
+            background: Theme.line;
+        }
+    }
+}
+
+component PlayerPanel inherits VerticalLayout {
+    alignment: start;
+    PanelHeader {
+        title: "Player";
+        description: "anchor opens every stream in your own mpv, so your mpv.conf, scripts and shaders apply. Picture, sound, Dolby Vision and the on-screen controls are mpv's.";
+    }
+    GroupTitle {
+        text: "mpv";
+    }
+    SettingRow {
+        title: "Program";
+        description: SettingsData.mpv-status;
+        Field {
+            placeholder: "Found on the PATH";
+            text <=> SettingsData.mpv-path;
+            edited(text) => {
+                SettingsData.mpv-path-edited(text);
+            }
+            done => {
+                SettingsData.check-mpv();
+            }
+        }
+    }
+    SettingRow {
+        title: "Extra arguments";
+        description: "Added to every launch, after anchor's own (title, start position, subtitles).";
+        Field {
+            placeholder: "For example --fs";
+            text <=> SettingsData.mpv-args;
+            edited(text) => {
+                SettingsData.mpv-args-edited(text);
+            }
+        }
+    }
+    GroupTitle {
+        text: "Subtitles";
+    }
+    SettingRow {
+        title: "Subtitles from addons";
+        description: "Passed to mpv as extra tracks. Your mpv.conf still decides which one shows.";
+        Switch {
+            on: SettingsData.addon-subtitles;
+            toggled => {
+                SettingsData.toggle-subtitles();
+            }
+        }
+    }
+    SettingRow {
+        title: "Languages";
+        description: "Only these are passed, in this order: mpv fetches each file when it starts.";
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: end;
+            for language[i] in SettingsData.languages: Rectangle {
+                height: 32px;
+                width: chip.preferred-width;
+                border-radius: 16px;
+                background: remove.has-hover ? Theme.surface-4 : Theme.surface-3;
+                chip := HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 8px;
+                    spacing: 6px;
+                    Text {
+                        text: language;
+                        color: Theme.text;
+                        font-size: Theme.fs-sm;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("icons/close.svg");
+                            width: 14px;
+                            height: 14px;
+                            colorize: Theme.text-3;
+                        }
+                    }
+                }
+                remove := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        SettingsData.remove-language(i);
+                    }
+                }
+            }
+            Rectangle {
+                height: 32px;
+                width: add-row.preferred-width;
+                border-radius: 16px;
+                border-width: 1px;
+                border-color: Theme.surface-4;
+                background: add-touch.has-hover ? Theme.surface-2 : transparent;
+                add-row := HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    Text {
+                        text: "+ Add";
+                        color: Theme.text-3;
+                        font-size: Theme.fs-sm;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
+                add-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        choose.show();
+                    }
+                }
+                choose := PopupWindow {
+                    x: parent.width - self.width;
+                    y: parent.height + 4px;
+                    width: 240px;
+                    height: min(SettingsData.language-options.length * 36px + 12px, 340px);
+                    close-policy: close-on-click-outside;
+                    Rectangle {
+                        border-radius: Theme.radius-md;
+                        background: Theme.surface-2;
+                        drop-shadow-blur: 24px;
+                        drop-shadow-offset-y: 8px;
+                        drop-shadow-color: #00000080;
+                        clip: true;
+                        ScrollView {
+                            y: 6px;
+                            height: parent.height - 12px;
+                            VerticalLayout {
+                                for option[i] in SettingsData.language-options: Rectangle {
+                                    height: 36px;
+                                    background: pick.has-hover ? Theme.surface-3 : transparent;
+                                    Text {
+                                        x: 16px;
+                                        text: option;
+                                        color: Theme.text;
+                                        font-size: Theme.fs-sm;
+                                    }
+                                    pick := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            SettingsData.add-language(i);
+                                            choose.close();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component AboutPanel inherits VerticalLayout {
+    // Clear cache asks once more before it deletes anything.
+    property <bool> confirming;
+    alignment: start;
+    HorizontalLayout {
+        alignment: start;
+        spacing: 14px;
+        HorizontalLayout {
+            Text {
+                text: "anchor";
+                color: Theme.text;
+                font-size: 40px;
+                font-weight: 800;
+            }
+            Text {
+                text: ".";
+                color: Theme.accent;
+                font-size: 40px;
+                font-weight: 800;
+            }
+        }
+        Text {
+            text: SettingsData.version;
+            color: Theme.text-2;
+            font-size: Theme.fs-md;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+    Text {
+        text: "A native Stremio client for Linux and macOS: it browses your addons and plays through your mpv. Free software under the GPL, version 3 or later. It is not made by Stremio.";
+        color: Theme.text-2;
+        font-size: Theme.fs-md;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        padding-top: 18px;
+        alignment: start;
+        Button {
+            text: "Source code";
+            icon: @image-url("icons/external.svg");
+            has-icon: true;
+            clicked => {
+                SettingsData.open-source();
+            }
+        }
+    }
+    GroupTitle {
+        text: "Build";
+    }
+    SettingRow {
+        title: "Version";
+        description: SettingsData.build;
+    }
+    GroupTitle {
+        text: "Files";
+    }
+    for file in SettingsData.files: HorizontalLayout {
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 20px;
+        Text {
+            width: 120px;
+            text: file.label;
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            font-weight: 600;
+        }
+        Text {
+            text: file.value;
+            color: Theme.text-2;
+            font-size: Theme.fs-sm;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+    }
+    HorizontalLayout {
+        padding-top: 18px;
+        spacing: 14px;
+        alignment: start;
+        Button {
+            kind: root.confirming ? ButtonKind.danger : ButtonKind.secondary;
+            text: SettingsData.clearing ? "Clearing…" : root.confirming ? "Click again to clear" : "Clear cache";
+            enabled: !SettingsData.clearing;
+            clicked => {
+                if (root.confirming) {
+                    root.confirming = false;
+                    SettingsData.clear-cache();
+                } else {
+                    root.confirming = true;
+                }
+            }
+        }
+        Text {
+            text: "Posters and cached answers download again; your account, library and settings stay.";
+            color: Theme.text-3;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            horizontal-stretch: 1;
+        }
+    }
+    // The question lapses after a few seconds.
+    Timer {
+        interval: 4s;
+        running: root.confirming;
+        triggered => {
+            root.confirming = false;
+        }
+    }
+}
+
+export component SettingsScreen inherits Rectangle {
+    // 0 account, 1 addons, 2 player, 3 about.
+    in-out property <int> section;
+    callback sign-out();
+    callback navigate(int);
+
+    public function focus-keys() {
+        keys.focus();
+    }
+
+    background: Theme.bg;
+    keys := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.navigate(0);
+            } else if (event.text == Key.UpArrow) {
+                root.section = max(0, root.section - 1);
+            } else if (event.text == Key.DownArrow) {
+                root.section = min(3, root.section + 1);
+            } else if (event.text == "/" || (event.modifiers.control && event.text.to-lowercase() == "k")) {
+                root.navigate(5);
+            } else {
+                return reject;
+            }
+            accept
+        }
+
+        VerticalLayout {
+            HorizontalLayout {
+                vertical-stretch: 1;
+                Rectangle {
+                    width: 250px;
+                    VerticalLayout {
+                        padding-top: 6px;
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 2px;
+                        alignment: start;
+                        VerticalLayout {
+                            padding-left: 12px;
+                            padding-bottom: 22px;
+                            spacing: 2px;
+                            Text {
+                                text: "Settings";
+                                color: Theme.text;
+                                font-size: Theme.fs-2xl;
+                                font-weight: 800;
+                            }
+                            Text {
+                                text: "anchor " + SettingsData.version;
+                                color: Theme.text-3;
+                                font-size: Theme.fs-sm;
+                            }
+                        }
+                        for item[i] in [
+                            { icon: @image-url("icons/user.svg"), text: "Account" },
+                            { icon: @image-url("icons/addons.svg"), text: "Addons" },
+                            { icon: @image-url("icons/window.svg"), text: "Player" },
+                            { icon: @image-url("icons/info.svg"), text: "About" },
+                        ]: SectionItem {
+                            icon: item.icon;
+                            text: item.text;
+                            count: i == 1 ? SettingsData.addons.length : "";
+                            selected: root.section == i;
+                            clicked => {
+                                root.section = i;
+                                keys.focus();
+                            }
+                        }
+                    }
+                    Rectangle {
+                        x: parent.width - 1px;
+                        width: 1px;
+                        background: Theme.line;
+                    }
+                }
+                ScrollView {
+                    horizontal-stretch: 1;
+                    VerticalLayout {
+                        padding-left: 48px;
+                        padding-right: 48px;
+                        padding-top: 6px;
+                        padding-bottom: 64px;
+                        alignment: start;
+                        if root.section == 0: AccountPanel {
+                            max-width: 820px;
+                            sign-out => {
+                                root.sign-out();
+                            }
+                        }
+                        if root.section == 1: AddonsPanel {
+                            max-width: 820px;
+                        }
+                        if root.section == 2: PlayerPanel {
+                            max-width: 820px;
+                        }
+                        if root.section == 3: AboutPanel {
+                            max-width: 820px;
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                height: 44px;
+                Rectangle {
+                    y: 0;
+                    height: 1px;
+                    background: Theme.line;
+                }
+                HorizontalLayout {
+                    padding-left: 24px;
+                    spacing: 22px;
+                    alignment: start;
+                    Hint {
+                        keys: ["↑", "↓"];
+                        label: "Section";
+                    }
+                    Hint {
+                        keys: ["Tab"];
+                        label: "Next field";
+                    }
+                    Hint {
+                        keys: ["Esc"];
+                        label: "Home";
+                    }
+                }
+            }
+        }
+    }
+}

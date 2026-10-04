@@ -231,6 +231,26 @@ fn steps() -> Vec<Step> {
             },
         },
         Step {
+            name: "settings-account",
+            wait: Duration::from_secs(1),
+            action: |app| app.invoke_navigate(6),
+        },
+        Step {
+            name: "settings-addons",
+            wait: Duration::from_millis(500),
+            action: |app| app.set_settings_section(1),
+        },
+        Step {
+            name: "settings-player",
+            wait: Duration::from_secs(1),
+            action: |app| app.set_settings_section(2),
+        },
+        Step {
+            name: "settings-about",
+            wait: Duration::from_secs(1),
+            action: |app| app.set_settings_section(3),
+        },
+        Step {
             name: "sidebar-folded",
             wait: Duration::from_millis(500),
             action: |app| app.global::<Shell>().invoke_toggle_sidebar(),

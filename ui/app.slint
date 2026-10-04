@@ -11,9 +11,10 @@ import { NowPlaying } from "nowplaying.slint";
 import { HomeScreen } from "home.slint";
 import { CatalogScreen } from "catalog.slint";
 import { TitleScreen } from "title.slint";
-import { CardItem, CatalogLink, EpisodeItem, HeroItem, PosterItem, RowItem, SeasonItem, SectionItem, StreamItem, TitleDetails } from "models.slint";
+import { SettingsData, SettingsScreen } from "settings.slint";
+import { AddonItem, CardItem, CatalogLink, EpisodeItem, Fact, HeroItem, PosterItem, RowItem, SeasonItem, SectionItem, StreamItem, TitleDetails } from "models.slint";
 
-export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, EpisodeItem, HeroItem, PosterItem, RowItem, SearchItem, SeasonItem, SectionItem, StreamItem, TitleDetails }
+export { Shell, SearchData, SettingsData, NowPlaying, AddonItem, CardItem, CatalogLink, EpisodeItem, Fact, HeroItem, PosterItem, RowItem, SearchItem, SeasonItem, SectionItem, StreamItem, TitleDetails }
 
 export enum Screen { login, home, catalog, search, title, settings }
 
@@ -82,6 +83,9 @@ export component AppWindow inherits Window {
         title.reveal-stream();
     }
 
+    // Settings: the section showing.
+    in-out property <int> settings-section;
+
     // A note at the foot of the window, for example "Saved to your Stremio
     // account"; empty for none.
     in property <string> toast;
@@ -112,6 +116,8 @@ export component AppWindow inherits Window {
             catalog.focus-keys();
         } else if (root.screen == Screen.title) {
             title.focus-keys();
+        } else if (root.screen == Screen.settings) {
+            settings.focus-keys();
         } else {
             home.focus-keys();
         }
@@ -223,6 +229,17 @@ export component AppWindow inherits Window {
                 playing: root.title-playing;
                 back => {
                     root.back();
+                }
+                navigate(i) => {
+                    root.navigate(i);
+                }
+            }
+
+            settings := SettingsScreen {
+                visible: root.screen == Screen.settings;
+                section <=> root.settings-section;
+                sign-out => {
+                    root.sign-out();
                 }
                 navigate(i) => {
                     root.navigate(i);

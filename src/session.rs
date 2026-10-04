@@ -11,6 +11,7 @@ mod catalog;
 mod home;
 mod playing;
 mod search;
+mod settings;
 mod shell;
 mod streams;
 mod title;
@@ -69,6 +70,8 @@ struct State {
     playing: Option<playing::Playing>,
     /// Source of playback tokens.
     tokens: u64,
+    /// When the account was last synced.
+    synced_at: Option<jiff::Timestamp>,
     /// Titles' metadata fetched so far, and those on their way.
     metas: home::Metas,
     fetching: HashSet<String>,
@@ -136,6 +139,7 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
     search.on_move(|delta| with_session(|s| s.search_move(delta)));
     search.on_all(|| with_session(|s| s.search_all()));
 
+    Session::wire_settings(app);
     session.apply_sidebar();
     session.open_saved();
 }

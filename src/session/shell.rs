@@ -105,7 +105,7 @@ impl Session {
                 self.show(Screen::Home);
             }
             SEARCH => app.invoke_focus_search(),
-            SETTINGS => {}
+            SETTINGS => self.open_settings(),
             _ => {}
         }
     }
