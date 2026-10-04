@@ -127,6 +127,30 @@ fn steps() -> Vec<Step> {
             },
         },
         Step {
+            name: "catalog",
+            wait: Duration::from_secs(3),
+            action: |app| app.global::<Shell>().invoke_open_catalog(0, 0),
+        },
+        Step {
+            name: "catalog-paged",
+            wait: Duration::from_secs(3),
+            action: |app| {
+                for _ in 0..4 {
+                    press(app, Key::PageDown);
+                }
+            },
+        },
+        Step {
+            name: "catalog-genre",
+            wait: Duration::from_secs(2),
+            action: |app| app.invoke_catalog_genre_selected(3),
+        },
+        Step {
+            name: "catalog-series",
+            wait: Duration::from_secs(3),
+            action: |app| app.global::<Shell>().invoke_open_catalog(1, 1),
+        },
+        Step {
             name: "sidebar-folded",
             wait: Duration::from_millis(500),
             action: |app| app.global::<Shell>().invoke_toggle_sidebar(),

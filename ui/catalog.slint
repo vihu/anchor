@@ -1,0 +1,295 @@
+// A catalog, full width: its genres as chips over a grid of posters that
+// loads more as it scrolls. The sidebar picks the catalog.
+// Layout: .ai-docs/mockups/03-catalog.html.
+
+import { ListView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Hint } from "atoms.slint";
+import { PosterItem } from "models.slint";
+import { PosterCard } from "cards.slint";
+
+component Chip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    // Keyboard focus is on it.
+    in property <bool> ring;
+    callback clicked();
+    height: 36px;
+    width: label.preferred-width + 32px;
+    border-radius: 18px;
+    background: root.active ? Theme.text : touch.has-hover ? Theme.surface-3 : Theme.surface-2;
+    border-width: root.ring ? 2px : 0px;
+    border-color: Theme.accent;
+    label := Text {
+        text: root.text;
+        color: root.active ? Theme.bg : touch.has-hover ? Theme.text : Theme.text-2;
+        font-size: Theme.fs-sm;
+        font-weight: 600;
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component CatalogScreen inherits Rectangle {
+    in property <string> title;
+    // For example "Movies · AIOMetadata".
+    in property <string> source;
+    in property <[string]> genres;
+    // The genre filtering the grid; -1 for all.
+    in property <int> genre;
+    in property <[PosterItem]> items;
+    in-out property <int> index;
+    // Shown instead of the grid while it is empty, for example "Loading…".
+    in property <string> note;
+    // More titles are on their way.
+    in property <bool> loading-more;
+    callback genre-selected(int);
+    callback open(int);
+    // Titles `first` to `first + count` are on screen.
+    callback items-visible(int, int);
+    callback navigate(int);
+
+    // Keyboard focus is on the chips rather than the grid, and which one.
+    property <bool> on-chips;
+    property <int> chip;
+
+    property <length> gap: 22px;
+    property <length> min-card: 148px;
+    property <int> columns: max(1, floor((list.visible-width + root.gap) / (root.min-card + root.gap)));
+    property <length> card-width: (list.visible-width - (root.columns - 1) * root.gap) / root.columns;
+    property <length> row-height: root.card-width * 1.5 + 72px;
+    property <int> row-count: ceil(root.items.length / root.columns);
+    property <int> first-row: max(0, floor(-list.content-y / root.row-height));
+    property <int> visible-rows: ceil(list.visible-height / root.row-height) + 1;
+
+    changed first-row => {
+        root.report();
+    }
+    changed columns => {
+        root.report();
+    }
+    changed visible-rows => {
+        root.report();
+    }
+
+    function report() {
+        root.items-visible(root.first-row * root.columns, root.visible-rows * root.columns);
+    }
+
+    public function focus-keys() {
+        keys.focus();
+        root.report();
+    }
+
+    // Back to the top of the grid, for a new catalog or genre.
+    public function rewind() {
+        list.content-y = 0;
+        root.index = 0;
+        root.on-chips = false;
+        root.report();
+    }
+
+    function reveal(index: int) {
+        let row = floor(max(0, index) / root.columns);
+        if (row * root.row-height < -list.content-y) {
+            list.content-y = -row * root.row-height;
+        } else if ((row + 1) * root.row-height > -list.content-y + list.visible-height) {
+            list.content-y = -((row + 1) * root.row-height - list.visible-height);
+        }
+    }
+
+    function select(target: int) {
+        if (root.items.length > 0) {
+            root.index = max(0, min(root.items.length - 1, target));
+            root.reveal(root.index);
+        }
+    }
+
+    background: Theme.bg;
+    keys := FocusScope {
+        key-pressed(event) => {
+            let key = event.text.to-lowercase();
+            if (event.text == "/" || (event.modifiers.control && key == "k")) {
+                root.navigate(5);
+            } else if (root.on-chips) {
+                if (event.text == Key.LeftArrow) {
+                    root.chip = max(-1, root.chip - 1);
+                } else if (event.text == Key.RightArrow) {
+                    root.chip = min(root.genres.length - 1, root.chip + 1);
+                } else if (event.text == Key.Return) {
+                    root.genre-selected(root.chip);
+                } else if (event.text == Key.DownArrow && root.items.length > 0) {
+                    root.on-chips = false;
+                } else if (event.text == Key.Escape) {
+                    root.navigate(0);
+                } else {
+                    return reject;
+                }
+            } else if (event.text == Key.UpArrow) {
+                if (root.index >= root.columns) {
+                    root.select(root.index - root.columns);
+                } else if (root.genres.length > 0) {
+                    root.on-chips = true;
+                    root.chip = root.genre;
+                }
+            } else if (event.text == Key.DownArrow) {
+                if (floor(root.index / root.columns) < root.row-count - 1) {
+                    root.select(root.index + root.columns);
+                }
+            } else if (event.text == Key.LeftArrow) {
+                root.select(root.index - 1);
+            } else if (event.text == Key.RightArrow) {
+                root.select(root.index + 1);
+            } else if (event.text == Key.PageUp) {
+                root.select(root.index - root.columns * max(1, root.visible-rows - 1));
+            } else if (event.text == Key.PageDown) {
+                root.select(root.index + root.columns * max(1, root.visible-rows - 1));
+            } else if (event.text == Key.Home) {
+                root.select(0);
+            } else if (event.text == Key.End) {
+                root.select(root.items.length - 1);
+            } else if (event.text == Key.Return && root.index >= 0 && root.index < root.items.length) {
+                root.open(root.index);
+            } else if (event.text == Key.Escape) {
+                root.navigate(0);
+            } else {
+                return reject;
+            }
+            accept
+        }
+
+        VerticalLayout {
+            HorizontalLayout {
+                padding-left: 48px;
+                padding-right: 48px;
+                padding-top: 6px;
+                padding-bottom: 16px;
+                spacing: 12px;
+                Text {
+                    text: root.title;
+                    color: Theme.text;
+                    font-size: Theme.fs-2xl;
+                    font-weight: 800;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.source;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-sm;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+            }
+            if root.genres.length > 0: Flickable {
+                height: 36px + 24px;
+                // Room for every chip: a layout in a Flickable otherwise takes
+                // the visible width and clips the chips past it.
+                content-width: (root.genres.length + 1) * 170px + 96px;
+                chips := HorizontalLayout {
+                    x: 48px;
+                    width: (root.genres.length + 1) * 170px;
+                    height: 36px;
+                    spacing: 8px;
+                    alignment: start;
+                    Chip {
+                        text: "All genres";
+                        active: root.genre == -1;
+                        ring: root.on-chips && root.chip == -1 && keys.has-focus;
+                        clicked => {
+                            root.genre-selected(-1);
+                            keys.focus();
+                        }
+                    }
+                    for name[i] in root.genres: Chip {
+                        text: name;
+                        active: i == root.genre;
+                        ring: root.on-chips && root.chip == i && keys.has-focus;
+                        clicked => {
+                            root.genre-selected(i);
+                            keys.focus();
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                vertical-stretch: 1;
+                HorizontalLayout {
+                    padding-left: 48px;
+                    padding-right: 36px;
+                    list := ListView {
+                        for r in root.row-count: HorizontalLayout {
+                            height: root.row-height;
+                            spacing: root.gap;
+                            alignment: start;
+                            for c in root.columns: PosterCard {
+                                property <int> i: r * root.columns + c;
+                                width: root.card-width;
+                                visible: self.i < root.items.length;
+                                item: root.items[self.i];
+                                selected: !root.on-chips && self.i == root.index && keys.has-focus;
+                                clicked => {
+                                    root.on-chips = false;
+                                    root.index = self.i;
+                                    keys.focus();
+                                    root.open(self.i);
+                                }
+                            }
+                        }
+                    }
+                }
+                if root.items.length == 0 && root.note != "": Text {
+                    x: 48px;
+                    y: 24px;
+                    width: parent.width - 96px;
+                    text: root.note;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-md;
+                    wrap: word-wrap;
+                }
+            }
+            Rectangle {
+                height: 44px;
+                Rectangle {
+                    y: 0;
+                    height: 1px;
+                    background: Theme.line;
+                }
+                HorizontalLayout {
+                    padding-left: 24px;
+                    spacing: 22px;
+                    alignment: start;
+                    Hint {
+                        keys: ["↑", "↓", "←", "→"];
+                        label: "Move";
+                    }
+                    Hint {
+                        keys: ["Enter"];
+                        label: root.on-chips ? "Filter" : "Open";
+                    }
+                    Hint {
+                        keys: ["↑"];
+                        label: "Genres";
+                    }
+                    Hint {
+                        keys: ["/"];
+                        label: "Search";
+                    }
+                    Hint {
+                        keys: ["Esc"];
+                        label: "Home";
+                    }
+                    if root.loading-more: Text {
+                        text: "Loading more…";
+                        color: Theme.text-3;
+                        font-size: Theme.fs-sm;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

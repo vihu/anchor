@@ -7,6 +7,7 @@
 //! or shown.
 
 mod account;
+mod catalog;
 mod home;
 mod shell;
 
@@ -55,6 +56,7 @@ struct State {
     wall: Vec<String>,
     wall_images: Rc<VecModel<Image>>,
     home: home::Home,
+    browse: catalog::Browse,
     /// Titles' metadata fetched so far, and those on their way.
     metas: home::Metas,
     fetching: HashSet<String>,
@@ -95,6 +97,11 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
     shell.on_fold(|i| with_session(|s| s.fold(i)));
     shell.on_open_catalog(|s, c| with_session(|session| session.open_catalog(s, c)));
     app.on_home_rows_visible(|first, count| with_session(|s| s.home_rows_visible(first, count)));
+    app.on_home_see_all(|row| with_session(|s| s.see_all(row)));
+    app.on_catalog_genre_selected(|g| with_session(|s| s.catalog_genre_selected(g)));
+    app.on_catalog_items_visible(|first, count| {
+        with_session(|s| s.catalog_items_visible(first, count));
+    });
 
     session.apply_sidebar();
     session.open_saved();
@@ -173,6 +180,9 @@ impl Session {
             }
         }
         self.home_art_ready(&url, size, &image);
+        if size == Size::Poster {
+            self.catalog_art_ready(&url, &image);
+        }
     }
 
     /// Fetches the metadata of title `id` of type `kind` from the first addon

@@ -9,6 +9,7 @@ import { Shell } from "sidebar.slint";
 import { SearchData, SearchItem, SearchScreen } from "search.slint";
 import { NowPlaying } from "nowplaying.slint";
 import { HomeScreen } from "home.slint";
+import { CatalogScreen } from "catalog.slint";
 import { CardItem, CatalogLink, HeroItem, PosterItem, RowItem, SectionItem } from "models.slint";
 
 export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, HeroItem, PosterItem, RowItem, SearchItem, SectionItem }
@@ -40,6 +41,24 @@ export component AppWindow inherits Window {
     callback home-see-all <=> home.see-all;
     callback home-rows-visible <=> home.rows-visible;
 
+    // A catalog.
+    in property <string> catalog-title;
+    in property <string> catalog-source;
+    in property <[string]> catalog-genres;
+    in property <int> catalog-genre: -1;
+    in property <[PosterItem]> catalog-items;
+    in-out property <int> catalog-index;
+    in property <string> catalog-note;
+    in property <bool> catalog-loading-more;
+    callback catalog-genre-selected <=> catalog.genre-selected;
+    callback catalog-open <=> catalog.open;
+    callback catalog-items-visible <=> catalog.items-visible;
+
+    // Scrolls a catalog's grid back to the top.
+    public function rewind-catalog() {
+        catalog.rewind();
+    }
+
     // The places: 0 Home, 5 the search field, 6 Settings.
     callback navigate(int);
     // The top bar's back button.
@@ -52,6 +71,8 @@ export component AppWindow inherits Window {
             login-screen.focus-first();
         } else if (root.screen == Screen.search) {
             browse.focus-search(false);
+        } else if (root.screen == Screen.catalog) {
+            catalog.focus-keys();
         } else {
             home.focus-keys();
         }
@@ -126,6 +147,21 @@ export component AppWindow inherits Window {
                 cards: root.home-cards;
                 rows: root.home-rows;
                 note: root.home-note;
+                navigate(i) => {
+                    root.navigate(i);
+                }
+            }
+
+            catalog := CatalogScreen {
+                visible: root.screen == Screen.catalog;
+                title: root.catalog-title;
+                source: root.catalog-source;
+                genres: root.catalog-genres;
+                genre: root.catalog-genre;
+                items: root.catalog-items;
+                index <=> root.catalog-index;
+                note: root.catalog-note;
+                loading-more: root.catalog-loading-more;
                 navigate(i) => {
                     root.navigate(i);
                 }

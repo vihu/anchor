@@ -93,11 +93,6 @@ impl Session {
         }
     }
 
-    /// A catalog picked in the sidebar.
-    pub(super) fn open_catalog(self: &Rc<Self>, section: i32, catalog: i32) {
-        self.light_catalog(section, catalog);
-    }
-
     /// A place: Home, the search field, Settings.
     pub(super) fn navigate(self: &Rc<Self>, place: i32) {
         let Some(app) = self.app.upgrade() else {
