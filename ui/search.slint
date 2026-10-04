@@ -1,0 +1,208 @@
+// Search: every catalog that can search, asked as you type in the top bar.
+// Results drop down under the field; the Search screen lists them all.
+// Layout: .ai-docs/mockups/04-search.html.
+
+import { ListView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Hint } from "atoms.slint";
+import { SearchItem } from "models.slint";
+
+export { SearchItem }
+
+// The search, shared by the top bar's field, the results under it and the
+// Search screen; the Rust side fills the results.
+export global SearchData {
+    in-out property <string> query;
+    in property <[SearchItem]> items;
+    in property <int> index: -1;
+    // For example "Searching…" or "Nothing found".
+    in property <string> note;
+    callback edited(string);
+    callback picked(int);
+    // Up and Down move through the results.
+    callback move(int);
+    // Opens the Search screen with every result.
+    callback all();
+}
+
+// One result, or a heading; `compact` under the top bar's field.
+export component ResultRow inherits Rectangle {
+    in property <SearchItem> item;
+    in property <bool> selected;
+    in property <bool> compact;
+    callback clicked();
+    height: root.item.heading ? 32px : root.compact ? 56px : 72px;
+    border-radius: Theme.radius-sm;
+    background: root.item.heading ? transparent : root.selected || touch.has-hover ? (root.compact ? Theme.surface-3 : Theme.surface-2) : transparent;
+    border-width: root.selected && !root.item.heading ? 1px : 0px;
+    border-color: Theme.accent-line;
+    if root.item.heading: Text {
+        x: 8px;
+        y: parent.height - self.height - 4px;
+        text: root.item.title;
+        color: Theme.text-3;
+        font-size: Theme.fs-xs;
+        font-weight: 700;
+    }
+    if !root.item.heading: HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 12px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: root.compact ? 32px : 40px;
+                height: self.width * 1.5;
+                border-radius: 4px;
+                clip: true;
+                background: @linear-gradient(180deg, root.item.tint 0%, Theme.surface-1 100%);
+                if root.item.has-poster: Image {
+                    width: 100%;
+                    height: 100%;
+                    source: root.item.poster;
+                    image-fit: cover;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text {
+                text: root.item.title;
+                color: Theme.text;
+                font-size: root.compact ? Theme.fs-sm : Theme.fs-md;
+                font-weight: 600;
+                overflow: elide;
+            }
+            Text {
+                text: root.item.subtitle;
+                color: Theme.text-3;
+                font-size: root.compact ? Theme.fs-xs : Theme.fs-sm;
+                overflow: elide;
+            }
+        }
+        if root.item.detail != "": HorizontalLayout {
+            spacing: 4px;
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: @image-url("icons/star.svg");
+                    width: 11px;
+                    height: 11px;
+                    colorize: Theme.accent;
+                }
+            }
+            Text {
+                text: root.item.detail;
+                color: Theme.text-2;
+                font-size: Theme.fs-xs;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+        }
+    }
+    touch := TouchArea {
+        enabled: !root.item.heading;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// The full Search screen.
+export component SearchScreen inherits Rectangle {
+    callback navigate(int);
+
+    // Scrolls the results so `row` is visible.
+    public function reveal(row: int) {
+        if (row <= 1) {
+            list.content-y = 0;
+        } else if ((row + 1) * 72px > -list.content-y + list.visible-height) {
+            list.content-y = -((row + 1) * 72px - list.visible-height);
+        } else if (row * 72px < -list.content-y) {
+            list.content-y = -row * 72px;
+        }
+    }
+
+    public function focus-keys() {
+        keys.focus();
+    }
+
+    background: Theme.bg;
+    keys := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.UpArrow) {
+                SearchData.move(-1);
+            } else if (event.text == Key.DownArrow) {
+                SearchData.move(1);
+            } else if (event.text == Key.Return) {
+                SearchData.picked(SearchData.index);
+            } else if (event.text == Key.Escape) {
+                root.navigate(0);
+            } else if (event.text == "/" || (event.modifiers.control && event.text.to-lowercase() == "k")) {
+                root.navigate(5);
+            } else {
+                return reject;
+            }
+            accept
+        }
+    }
+    VerticalLayout {
+        padding-left: 48px;
+        padding-right: 48px;
+        padding-top: 6px;
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 14px;
+            Text {
+                text: SearchData.query == "" ? "Search" : "Results for \u{201c}" + SearchData.query + "\u{201d}";
+                color: Theme.text;
+                font-size: Theme.fs-2xl;
+                font-weight: 800;
+                overflow: elide;
+            }
+        }
+        if SearchData.note != "" || SearchData.query == "": Text {
+            text: SearchData.query == "" ? "Type in the search bar above: every catalog in your addons that can search is asked." : SearchData.note;
+            color: Theme.text-3;
+            font-size: Theme.fs-md;
+            wrap: word-wrap;
+        }
+        list := ListView {
+            vertical-stretch: 1;
+            for item[i] in SearchData.items: ResultRow {
+                item: item;
+                selected: i == SearchData.index;
+                clicked => {
+                    SearchData.picked(i);
+                }
+            }
+        }
+        Rectangle {
+            height: 44px;
+            Rectangle {
+                y: 0;
+                height: 1px;
+                background: Theme.line;
+            }
+            HorizontalLayout {
+                spacing: 22px;
+                alignment: start;
+                Hint {
+                    keys: ["↑", "↓"];
+                    label: "Choose";
+                }
+                Hint {
+                    keys: ["Enter"];
+                    label: "Open";
+                }
+                Hint {
+                    keys: ["Esc"];
+                    label: "Back";
+                }
+            }
+        }
+    }
+}

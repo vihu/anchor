@@ -1,0 +1,477 @@
+// The window's sidebar: Home, then a section per content type listing every
+// catalog the addons offer for it (each folds away), and the account chip,
+// which opens Settings and Sign out. A button by the wordmark (or Ctrl+B)
+// folds the sidebar to icons. Layout: .ai-docs/mockups/03-catalog.html.
+
+import { Theme } from "theme.slint";
+import { Kbd } from "atoms.slint";
+import { SectionItem } from "models.slint";
+
+// The sidebar's state; the Rust side fills it and remembers the choices.
+export global Shell {
+    in property <bool> sidebar-expanded: true;
+    // The account: initials, email, and for example "3 addons · synced".
+    in property <string> avatar;
+    in property <string> email;
+    in property <string> meta;
+    in property <[SectionItem]> sections;
+    // The catalog showing, by section and place; -1 for none.
+    in property <int> active-section: -1;
+    in property <int> active-catalog: -1;
+    callback toggle-sidebar();
+    // A section's chevron: folds it away, or back.
+    callback fold(int);
+    // A catalog, by section and place.
+    callback open-catalog(int, int);
+}
+
+component NavItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    // Highlighted: the place showing.
+    in property <bool> active;
+    // A section heading: bold, and lit only by its icon when expanded.
+    in property <bool> heading;
+    in property <bool> folded;
+    callback clicked();
+    callback chevron();
+    height: 44px;
+    border-radius: Theme.radius-md;
+    background: root.active && (!root.heading || !Shell.sidebar-expanded) ? Theme.surface-3 : touch.has-hover ? Theme.surface-2 : transparent;
+    property <color> ink: root.active || root.heading || touch.has-hover ? Theme.text : Theme.text-2;
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+    if Shell.sidebar-expanded: HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 8px;
+        spacing: 14px;
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                width: 20px;
+                height: 20px;
+                colorize: root.active ? Theme.accent : root.ink;
+            }
+        }
+        Text {
+            text: root.text;
+            color: root.ink;
+            font-size: Theme.fs-md;
+            font-weight: root.heading ? 600 : 500;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+        if root.heading: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 28px;
+                height: 28px;
+                border-radius: Theme.radius-sm;
+                background: chevron-touch.has-hover ? Theme.surface-3 : transparent;
+                Image {
+                    source: root.folded ? @image-url("icons/right.svg") : @image-url("icons/down.svg");
+                    width: 16px;
+                    height: 16px;
+                    colorize: chevron-touch.has-hover ? Theme.text : Theme.text-3;
+                }
+                chevron-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.chevron();
+                    }
+                }
+            }
+        }
+    }
+    if !Shell.sidebar-expanded: Image {
+        source: root.icon;
+        width: 20px;
+        height: 20px;
+        colorize: root.active ? Theme.accent : root.ink;
+    }
+}
+
+// A catalog under its section's heading, hung on the section's guide line.
+component CatalogRow inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked();
+    height: 34px;
+    Rectangle {
+        x: 8px;
+        width: parent.width - 8px;
+        border-radius: Theme.radius-sm;
+        background: root.active ? Theme.accent-soft : touch.has-hover ? Theme.surface-2 : transparent;
+        Text {
+            x: 15px;
+            width: parent.width - 23px;
+            text: root.text;
+            color: root.active ? Theme.accent : touch.has-hover ? Theme.text : Theme.text-2;
+            font-size: 14px;
+            font-weight: 500;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+    if root.active: Rectangle {
+        x: -1px;
+        y: 8px;
+        width: 3px;
+        height: parent.height - 16px;
+        border-radius: 1.5px;
+        background: Theme.accent;
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// One row of the account menu.
+component MenuRow inherits Rectangle {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> key;
+    callback clicked();
+    height: 46px;
+    border-radius: Theme.radius-sm;
+    background: touch.has-hover ? Theme.surface-3 : transparent;
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                width: 20px;
+                height: 20px;
+                colorize: Theme.text-2;
+            }
+        }
+        Text {
+            text: root.title;
+            color: Theme.text;
+            font-size: Theme.fs-md;
+            font-weight: 500;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        if root.key != "": VerticalLayout {
+            alignment: center;
+            Kbd {
+                text: root.key;
+            }
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component Sidebar inherits Rectangle {
+    // Home is showing; Settings lights the account chip.
+    in property <bool> home-active;
+    in property <bool> settings-active;
+    // 0 Home, 6 Settings.
+    callback navigate(int);
+    callback sign-out();
+
+    width: Shell.sidebar-expanded ? 236px : 76px;
+    background: Theme.surface-1;
+    VerticalLayout {
+        padding-top: 22px;
+        padding-bottom: 16px;
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 4px;
+        // The wordmark and the fold button: side by side, or stacked when
+        // folded.
+        if Shell.sidebar-expanded: HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 4px;
+            padding-bottom: 18px;
+            Text {
+                text: "anchor";
+                color: Theme.text;
+                font-size: 26px;
+                font-weight: 800;
+                vertical-alignment: center;
+            }
+            Text {
+                text: ".";
+                color: Theme.accent;
+                font-size: 26px;
+                font-weight: 800;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: Theme.radius-sm;
+                    background: fold-touch.has-hover ? Theme.surface-2 : transparent;
+                    Image {
+                        source: @image-url("icons/panel-close.svg");
+                        width: 20px;
+                        height: 20px;
+                        colorize: fold-touch.has-hover ? Theme.text : Theme.text-3;
+                    }
+                    fold-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            Shell.toggle-sidebar();
+                        }
+                    }
+                }
+            }
+        }
+        if !Shell.sidebar-expanded: VerticalLayout {
+            padding-bottom: 14px;
+            spacing: 14px;
+            HorizontalLayout {
+                alignment: center;
+                Text {
+                    text: "a";
+                    color: Theme.text;
+                    font-size: 22px;
+                    font-weight: 800;
+                }
+                Text {
+                    text: ".";
+                    color: Theme.accent;
+                    font-size: 22px;
+                    font-weight: 800;
+                }
+            }
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: Theme.radius-sm;
+                    background: unfold-touch.has-hover ? Theme.surface-2 : transparent;
+                    Image {
+                        source: @image-url("icons/panel-open.svg");
+                        width: 20px;
+                        height: 20px;
+                        colorize: unfold-touch.has-hover ? Theme.text : Theme.text-3;
+                    }
+                    unfold-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            Shell.toggle-sidebar();
+                        }
+                    }
+                }
+            }
+        }
+        Flickable {
+            vertical-stretch: 1;
+            content-height: places.preferred-height;
+            places := VerticalLayout {
+                alignment: start;
+                spacing: 4px;
+                NavItem {
+                    icon: @image-url("icons/home.svg");
+                    text: "Home";
+                    active: root.home-active;
+                    clicked => {
+                        root.navigate(0);
+                    }
+                }
+                for section[s] in Shell.sections: VerticalLayout {
+                    padding-top: Shell.sidebar-expanded ? 14px : 0px;
+                    spacing: 2px;
+                    NavItem {
+                        // 0 movies, 1 series, 2 another type.
+                        icon: section.icon == 0 ? @image-url("icons/film.svg") : section.icon == 1 ? @image-url("icons/series.svg") : @image-url("icons/addons.svg");
+                        text: section.title;
+                        heading: true;
+                        folded: section.folded;
+                        active: s == Shell.active-section;
+                        clicked => {
+                            Shell.open-catalog(s, s == Shell.active-section ? max(0, Shell.active-catalog) : 0);
+                        }
+                        chevron => {
+                            Shell.fold(s);
+                        }
+                    }
+                    if Shell.sidebar-expanded && !section.folded: Rectangle {
+                        height: catalogs.preferred-height;
+                        // The guide under the heading's icon.
+                        Rectangle {
+                            x: 22px;
+                            width: 1px;
+                            background: Theme.line;
+                        }
+                        catalogs := VerticalLayout {
+                            x: 22px;
+                            width: parent.width - 22px;
+                            spacing: 2px;
+                            for catalog[c] in section.catalogs: CatalogRow {
+                                text: catalog.title;
+                                active: s == Shell.active-section && c == Shell.active-catalog;
+                                clicked => {
+                                    Shell.open-catalog(s, c);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // The account chip; opens the account menu.
+        Rectangle {
+            border-radius: Theme.radius-md;
+            background: chip-touch.has-hover ? Theme.surface-3 : Shell.sidebar-expanded ? Theme.surface-2 : transparent;
+            border-width: root.settings-active ? 1px : 0px;
+            border-color: Theme.accent-line;
+            HorizontalLayout {
+                padding: Shell.sidebar-expanded ? 10px : 8px;
+                padding-left: Shell.sidebar-expanded ? 12px : 8px;
+                spacing: 12px;
+                alignment: Shell.sidebar-expanded ? start : center;
+                Rectangle {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 9px;
+                    background: Theme.surface-4;
+                    Text {
+                        text: Shell.avatar;
+                        color: Theme.text;
+                        font-size: Theme.fs-sm;
+                        font-weight: 700;
+                    }
+                }
+                if Shell.sidebar-expanded: VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: Shell.email;
+                        color: Theme.text;
+                        font-size: Theme.fs-sm;
+                        font-weight: 600;
+                        overflow: elide;
+                    }
+                    if Shell.meta != "": Text {
+                        text: Shell.meta;
+                        color: Theme.text-3;
+                        font-size: Theme.fs-xs;
+                        overflow: elide;
+                    }
+                }
+                if Shell.sidebar-expanded: VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("icons/updown.svg");
+                        width: 16px;
+                        height: 16px;
+                        colorize: Theme.text-3;
+                    }
+                }
+            }
+            chip-touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    menu.show();
+                }
+            }
+        }
+    }
+
+    // The account, then Settings and Sign out.
+    menu := PopupWindow {
+        x: Shell.sidebar-expanded ? 14px : 82px;
+        width: Shell.sidebar-expanded ? root.width - 28px : 280px;
+        height: 16px + 56px + 13px + 2 * 46px;
+        y: root.height - (Shell.sidebar-expanded ? 76px : 16px) - self.height;
+        close-policy: close-on-click-outside;
+        Rectangle {
+            background: Theme.surface-2;
+            border-radius: Theme.radius-lg;
+            drop-shadow-blur: 28px;
+            drop-shadow-offset-y: 10px;
+            drop-shadow-color: #00000073;
+            VerticalLayout {
+                padding: 8px;
+                HorizontalLayout {
+                    height: 56px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 12px;
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 7px;
+                            background: Theme.surface-4;
+                            Text {
+                                text: Shell.avatar;
+                                color: Theme.text;
+                                font-size: 11px;
+                                font-weight: 700;
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Text {
+                            text: Shell.email;
+                            color: Theme.text;
+                            font-size: Theme.fs-sm;
+                            font-weight: 600;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: "Stremio account";
+                            color: Theme.text-3;
+                            font-size: Theme.fs-xs;
+                        }
+                    }
+                }
+                Rectangle {
+                    height: 13px;
+                    Rectangle {
+                        x: 4px;
+                        width: parent.width - 8px;
+                        height: 1px;
+                        background: Theme.line;
+                    }
+                }
+                MenuRow {
+                    icon: @image-url("icons/settings.svg");
+                    title: "Settings";
+                    key: "Ctrl+,";
+                    clicked => {
+                        menu.close();
+                        root.navigate(6);
+                    }
+                }
+                MenuRow {
+                    icon: @image-url("icons/logout.svg");
+                    title: "Sign out";
+                    clicked => {
+                        menu.close();
+                        root.sign-out();
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,9 +1,67 @@
-// The anchor window.
+// The anchor window: sign-in, and the browse screens beside the sidebar and
+// under the top bar.
 
 import "fonts/SchibstedGrotesk.ttf";
 import { Theme } from "theme.slint";
+import { LoginScreen } from "login.slint";
+import { Browse } from "browse.slint";
+import { Shell } from "sidebar.slint";
+import { SearchData, SearchItem, SearchScreen } from "search.slint";
+import { NowPlaying } from "nowplaying.slint";
+import { HomeScreen } from "home.slint";
+import { CardItem, CatalogLink, PosterItem, RowItem, SectionItem } from "models.slint";
+
+export { Shell, SearchData, NowPlaying, CardItem, CatalogLink, PosterItem, RowItem, SearchItem, SectionItem }
+
+export enum Screen { login, home, catalog, search, title, settings }
 
 export component AppWindow inherits Window {
+    in-out property <Screen> screen: Screen.login;
+
+    // Sign-in.
+    in-out property <string> login-email;
+    in-out property <string> login-password;
+    in property <string> login-error;
+    in property <bool> login-busy;
+    in property <[image]> login-posters;
+    callback login <=> login-screen.submit;
+    callback create-account <=> login-screen.create-account;
+    callback sign-out();
+
+    // Home.
+    in property <string> home-note;
+
+    // The places: 0 Home, 5 the search field, 6 Settings.
+    callback navigate(int);
+    // The top bar's back button.
+    in property <string> back-label;
+    callback back();
+
+    // Moves keyboard focus to the screen that is showing.
+    public function focus-screen() {
+        if (root.screen == Screen.login) {
+            login-screen.focus-first();
+        } else if (root.screen == Screen.search) {
+            browse.focus-search(false);
+        } else {
+            home.focus-keys();
+        }
+    }
+
+    // `/` or Ctrl+K: focuses the search field with the last query selected.
+    public function focus-search() {
+        browse.focus-search(true);
+    }
+
+    // Scrolls the search results to the selected one.
+    public function reveal-search-row() {
+        if (root.screen == Screen.search) {
+            search.reveal(SearchData.index);
+        } else {
+            browse.reveal(SearchData.index);
+        }
+    }
+
     title: "anchor";
     min-width: 1180px;
     min-height: 720px;
@@ -13,24 +71,69 @@ export component AppWindow inherits Window {
     default-font-family: "Schibsted Grotesk";
     default-font-size: Theme.fs-md;
 
-    HorizontalLayout {
-        alignment: center;
-        VerticalLayout {
-            alignment: center;
-            HorizontalLayout {
-                Text {
-                    text: "anchor";
-                    color: Theme.text;
-                    font-size: Theme.fs-4xl;
-                    font-weight: 800;
-                }
-                Text {
-                    text: ".";
-                    color: Theme.accent;
-                    font-size: Theme.fs-4xl;
-                    font-weight: 800;
+    property <bool> browsing: root.screen != Screen.login;
+
+    // Ctrl+B and Ctrl+, anywhere: whatever a screen does not handle reaches
+    // here.
+    shell-keys := FocusScope {
+        key-pressed(event) => {
+            if (event.modifiers.control && event.text.to-lowercase() == "b" && root.browsing) {
+                Shell.toggle-sidebar();
+                return accept;
+            }
+            if (event.modifiers.control && event.text == "," && root.browsing) {
+                root.navigate(6);
+                return accept;
+            }
+            reject
+        }
+
+        browse := Browse {
+            visible: root.browsing;
+            home-active: root.screen == Screen.home;
+            settings-active: root.screen == Screen.settings;
+            back-label: root.back-label;
+            searching: root.screen == Screen.search;
+            navigate(i) => {
+                root.navigate(i);
+            }
+            sign-out => {
+                root.sign-out();
+            }
+            back => {
+                root.back();
+            }
+            escape => {
+                if (root.screen == Screen.search) {
+                    root.navigate(0);
+                } else {
+                    root.focus-screen();
                 }
             }
+
+            home := HomeScreen {
+                visible: root.screen == Screen.home;
+                note: root.home-note;
+                navigate(i) => {
+                    root.navigate(i);
+                }
+            }
+
+            search := SearchScreen {
+                visible: root.screen == Screen.search;
+                navigate(i) => {
+                    root.navigate(i);
+                }
+            }
+        }
+
+        login-screen := LoginScreen {
+            visible: root.screen == Screen.login;
+            email <=> root.login-email;
+            password <=> root.login-password;
+            error: root.login-error;
+            busy: root.login-busy;
+            posters: root.login-posters;
         }
     }
 }

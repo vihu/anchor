@@ -1,0 +1,150 @@
+// Data the Rust side hands to the screens.
+
+// A catalog in the sidebar.
+export struct CatalogLink {
+    title: string,
+}
+
+// A sidebar section: a content type and its catalogs.
+export struct SectionItem {
+    title: string,
+    // 0 movies, 1 series, 2 any other type: its icon.
+    icon: int,
+    folded: bool,
+    catalogs: [CatalogLink],
+}
+
+// A title in a row or a grid.
+export struct PosterItem {
+    title: string,
+    // For example "2025".
+    detail: string,
+    // Out of 10, for example "7.4"; empty when unrated.
+    rating: string,
+    tint: color,
+    poster: image,
+    has-poster: bool,
+    // How far it was watched, 0 to 1; 0 when never started.
+    progress: float,
+    watched: bool,
+}
+
+// A title left unfinished, in Continue watching.
+export struct CardItem {
+    title: string,
+    // For example "S2 E4".
+    detail: string,
+    // For example "18 min left", in the accent; empty for none.
+    left: string,
+    // On the picture, for example "New episode".
+    tag: string,
+    tint: color,
+    image: image,
+    has-image: bool,
+    progress: float,
+}
+
+// One of Home's catalog rows.
+export struct RowItem {
+    title: string,
+    // The addon it comes from, for example "AIOMetadata".
+    source: string,
+    items: [PosterItem],
+    // Shown instead of the titles, for example "Loading…".
+    note: string,
+}
+
+// A search result or a heading between them.
+export struct SearchItem {
+    // A heading such as "Movies" instead of a result.
+    heading: bool,
+    title: string,
+    // For example "Movie · 2025 · AIOMetadata".
+    subtitle: string,
+    // The rating, for example "7.4".
+    detail: string,
+    tint: color,
+    poster: image,
+    has-poster: bool,
+}
+
+// The page of a movie or a series.
+export struct TitleDetails {
+    title: string,
+    // For example "2025 · 2 h 4 min · Adventure, Family".
+    meta: string,
+    rating: string,
+    plot: string,
+    // For example "Directed by Ana Dimas · With Teo Larsen, Margit Holm".
+    credits: string,
+    tint: color,
+    poster: image,
+    has-poster: bool,
+    backdrop: image,
+    has-backdrop: bool,
+    // Shown while it loads, or when it fails.
+    note: string,
+    // The main button, for example "Play" or "Resume S2 E4".
+    play-label: string,
+    // For example "18 min left".
+    left: string,
+    // Offer "From the beginning".
+    restart: bool,
+    watched: bool,
+    // Playing in mpv now.
+    playing: bool,
+}
+
+// A season tab.
+export struct SeasonItem {
+    name: string,
+    count: string,
+}
+
+// An episode in a series' list.
+export struct EpisodeItem {
+    number: string,
+    title: string,
+    plot: string,
+    // For example "47 min", "Out Sun 12 Oct", "18 min left" or "Watched".
+    state: string,
+    still: image,
+    has-still: bool,
+    progress: float,
+    watched: bool,
+    // Started and not finished.
+    resumable: bool,
+    // Not out yet.
+    upcoming: bool,
+    // Playing in mpv now.
+    playing: bool,
+}
+
+// A stream in the streams panel.
+export struct StreamItem {
+    // A heading with the addon's name instead of a stream.
+    heading: bool,
+    name: string,
+    details: string,
+    // For example "Last used" or "Failed".
+    tag: string,
+    failed: bool,
+}
+
+// One "label: value" fact in Settings.
+export struct Fact {
+    label: string,
+    value: string,
+}
+
+// An addon in Settings.
+export struct AddonItem {
+    // Two letters for its tile.
+    short: string,
+    tint: color,
+    name: string,
+    version: string,
+    host: string,
+    // For example ["Catalogs", "Metadata"].
+    does: [string],
+}

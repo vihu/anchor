@@ -11,5 +11,6 @@ pub mod library;
 pub mod net;
 pub mod player;
 pub mod settings;
+pub mod sources;
 pub mod store;
 pub mod watched;

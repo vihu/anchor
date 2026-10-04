@@ -1,0 +1,290 @@
+// The top bar of the browse screens: a back button on the left, the search
+// field in the middle, and while mpv plays, a pill on the right; results as
+// you type drop down under the field. Layout: .ai-docs/mockups/02-home.html.
+
+import { ListView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Kbd } from "atoms.slint";
+import { ResultRow, SearchData } from "search.slint";
+import { NowPlaying } from "nowplaying.slint";
+
+export component TopBar inherits Rectangle {
+    // The back button's label, for example "Home"; empty for none.
+    in property <string> back-label;
+    // Results show under the field: its lower corners square off.
+    in property <bool> open;
+    out property <bool> field-focused: field.has-focus;
+    // The field's place in the bar, for the results under it.
+    out property <length> field-x: box.x;
+    out property <length> field-y: box.y + box.height;
+    out property <length> field-width: box.width;
+    callback back();
+    callback enter();
+    callback escape();
+
+    // Focuses the field; `select` selects the query, so typing replaces it.
+    public function focus-field(select: bool) {
+        field.focus();
+        if (select) {
+            field.select-all();
+        }
+    }
+
+    height: 68px;
+    if root.back-label != "": Rectangle {
+        x: 24px;
+        y: (parent.height - self.height) / 2;
+        width: back-row.preferred-width + 24px;
+        height: 38px;
+        border-radius: Theme.radius-md;
+        background: back-touch.has-hover ? Theme.surface-2 : transparent;
+        back-row := HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            spacing: 8px;
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: @image-url("icons/arrow-left.svg");
+                    width: 16px;
+                    height: 16px;
+                    colorize: back-touch.has-hover ? Theme.text : Theme.text-2;
+                }
+            }
+            Text {
+                text: root.back-label;
+                color: back-touch.has-hover ? Theme.text : Theme.text-2;
+                font-size: Theme.fs-sm;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+        }
+        back-touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.back();
+            }
+        }
+    }
+    box := Rectangle {
+        width: min(560px, max(320px, root.width - 480px));
+        height: 44px;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        border-top-left-radius: 22px;
+        border-top-right-radius: 22px;
+        border-bottom-left-radius: root.open ? 0px : 22px;
+        border-bottom-right-radius: root.open ? 0px : 22px;
+        background: !field.has-focus && box-touch.has-hover ? Theme.surface-3 : Theme.surface-2;
+        border-width: field.has-focus ? 2px : 0px;
+        border-color: Theme.accent;
+        box-touch := TouchArea {
+            mouse-cursor: text;
+            clicked => {
+                field.focus();
+            }
+        }
+        // Arrows, Enter and Esc drive the results; everything else types.
+        FocusScope {
+            focus-on-click: false;
+            capture-key-pressed(event) => {
+                if (event.text == Key.UpArrow) {
+                    SearchData.move(-1);
+                } else if (event.text == Key.DownArrow) {
+                    SearchData.move(1);
+                } else if (event.text == Key.Return) {
+                    root.enter();
+                } else if (event.text == Key.Escape) {
+                    root.escape();
+                } else {
+                    return reject;
+                }
+                accept
+            }
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 12px;
+                spacing: 10px;
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("icons/search.svg");
+                        width: 18px;
+                        height: 18px;
+                        colorize: field.has-focus ? Theme.text-2 : Theme.text-3;
+                    }
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                    if SearchData.query == "": Text {
+                        x: 0;
+                        width: parent.width;
+                        height: parent.height;
+                        text: "Search movies and series";
+                        color: Theme.text-3;
+                        font-size: Theme.fs-md;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    field := TextInput {
+                        width: parent.width;
+                        height: parent.height;
+                        text <=> SearchData.query;
+                        color: Theme.text;
+                        font-size: Theme.fs-md;
+                        vertical-alignment: center;
+                        single-line: true;
+                        selection-background-color: Theme.accent;
+                        selection-foreground-color: Theme.accent-ink;
+                        edited => {
+                            SearchData.edited(self.text);
+                        }
+                    }
+                }
+                if !field.has-focus: VerticalLayout {
+                    alignment: center;
+                    Kbd {
+                        text: "/";
+                    }
+                }
+            }
+        }
+    }
+    // mpv is playing: what, and where it is; opens the title's page.
+    if NowPlaying.active: Rectangle {
+        x: root.width - 24px - self.width;
+        y: (root.height - self.height) / 2;
+        width: pill.preferred-width;
+        height: 36px;
+        border-radius: 18px;
+        background: pill-touch.has-hover ? #4da3ff33 : Theme.accent-soft;
+        pill := HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 14px;
+            spacing: 10px;
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: @image-url("icons/window.svg");
+                    width: 16px;
+                    height: 16px;
+                    colorize: Theme.accent;
+                }
+            }
+            Text {
+                text: "Playing in mpv";
+                color: Theme.accent;
+                font-size: Theme.fs-sm;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            Text {
+                text: NowPlaying.label;
+                color: Theme.text-2;
+                font-size: Theme.fs-sm;
+                font-weight: 500;
+                vertical-alignment: center;
+                max-width: 220px;
+                overflow: elide;
+            }
+        }
+        pill-touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                NowPlaying.open();
+            }
+        }
+    }
+}
+
+// Results as you type, under the top bar's field: the rows of the Search
+// screen, then "All results".
+export component SearchDropdown inherits Rectangle {
+
+    // Scrolls the results so `row` is visible.
+    public function reveal(row: int) {
+        if (row <= 1) {
+            list.content-y = 0;
+        } else if ((row + 1) * 56px > -list.content-y + list.visible-height) {
+            list.content-y = -((row + 1) * 56px - list.visible-height);
+        } else if (row * 56px < -list.content-y) {
+            list.content-y = -row * 56px;
+        }
+    }
+
+    property <length> rows-height: min(SearchData.items.length * 56px, 8 * 56px);
+
+    height: 2px + 6px + (SearchData.note != "" ? 44px : 0px) + root.rows-height + 48px + 2px;
+    background: Theme.surface-2;
+    border-bottom-left-radius: Theme.radius-lg;
+    border-bottom-right-radius: Theme.radius-lg;
+    border-width: 2px;
+    border-color: Theme.accent;
+    drop-shadow-blur: 28px;
+    drop-shadow-offset-y: 10px;
+    drop-shadow-color: #00000073;
+    // Swallows clicks between the rows, so they do not reach the screen.
+    TouchArea { }
+    VerticalLayout {
+        padding: 2px;
+        padding-top: 8px;
+        padding-left: 10px;
+        padding-right: 10px;
+        if SearchData.note != "": HorizontalLayout {
+            height: 44px;
+            padding-left: 8px;
+            Text {
+                text: SearchData.note;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                vertical-alignment: center;
+            }
+        }
+        list := ListView {
+            height: root.rows-height;
+            for item[i] in SearchData.items: ResultRow {
+                item: item;
+                selected: i == SearchData.index;
+                compact: true;
+                clicked => {
+                    SearchData.picked(i);
+                }
+            }
+        }
+        Rectangle {
+            height: 48px;
+            Rectangle {
+                y: 4px;
+                height: 1px;
+                background: Theme.line;
+            }
+            HorizontalLayout {
+                padding-top: 6px;
+                padding-left: 8px;
+                padding-right: 6px;
+                spacing: 10px;
+                Text {
+                    text: "All results for \u{201c}" + SearchData.query + "\u{201d}";
+                    color: all-touch.has-hover || SearchData.index == -1 ? Theme.text : Theme.text-2;
+                    font-size: Theme.fs-sm;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                if SearchData.index == -1: VerticalLayout {
+                    alignment: center;
+                    Kbd {
+                        text: "Enter";
+                    }
+                }
+            }
+            all-touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    SearchData.all();
+                }
+            }
+        }
+    }
+}

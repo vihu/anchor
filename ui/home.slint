@@ -1,0 +1,30 @@
+// Home: what the account's addons and library hold.
+// Layout: .ai-docs/mockups/02-home.html.
+
+import { Theme } from "theme.slint";
+
+export component HomeScreen inherits Rectangle {
+    // Shown while the account loads, or when it cannot.
+    in property <string> note;
+    callback navigate(int);
+
+    public function focus-keys() {
+        keys.focus();
+    }
+
+    background: Theme.bg;
+    keys := FocusScope {
+        key-pressed(event) => {
+            if (event.text == "/" || (event.modifiers.control && event.text.to-lowercase() == "k")) {
+                root.navigate(5);
+                return accept;
+            }
+            reject
+        }
+    }
+    Text {
+        text: root.note;
+        color: Theme.text-3;
+        font-size: Theme.fs-md;
+    }
+}

@@ -1,0 +1,77 @@
+// The frame of the browse screens: the sidebar on the left, the top bar
+// above, and the screens (the children) below it; results as you type drop
+// over them. Layout: .ai-docs/mockups/02-home.html.
+
+import { SearchData } from "search.slint";
+import { Sidebar } from "sidebar.slint";
+import { SearchDropdown, TopBar } from "topbar.slint";
+
+export component Browse inherits Rectangle {
+    in property <bool> home-active;
+    in property <bool> settings-active;
+    // The back button's label; empty for none.
+    in property <string> back-label;
+    // The Search screen shows: the results fill it, not a drop-down.
+    in property <bool> searching;
+    callback navigate(int);
+    callback sign-out();
+    callback back();
+    // Esc in the search field.
+    callback escape();
+
+    // Focuses the search field; `select` selects the query.
+    public function focus-search(select: bool) {
+        topbar.focus-field(select);
+    }
+
+    // Scrolls the results under the field to row `row`.
+    public function reveal(row: int) {
+        dropdown.reveal(row);
+    }
+
+    HorizontalLayout {
+        sidebar := Sidebar {
+            home-active: root.home-active;
+            settings-active: root.settings-active;
+            navigate(i) => {
+                root.navigate(i);
+            }
+            sign-out => {
+                root.sign-out();
+            }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+            Rectangle {
+                y: topbar.height;
+                height: parent.height - topbar.height;
+                @children
+            }
+            topbar := TopBar {
+                y: 0;
+                back-label: root.back-label;
+                open: dropdown.visible;
+                back => {
+                    root.back();
+                }
+                enter => {
+                    if (SearchData.index >= 0) {
+                        SearchData.picked(SearchData.index);
+                    } else if (!root.searching && SearchData.query != "") {
+                        SearchData.all();
+                    }
+                }
+                escape => {
+                    root.escape();
+                }
+            }
+        }
+    }
+
+    dropdown := SearchDropdown {
+        visible: !root.searching && topbar.field-focused && SearchData.query != "";
+        x: sidebar.width + topbar.field-x;
+        y: topbar.field-y;
+        width: topbar.field-width;
+    }
+}

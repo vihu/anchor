@@ -1,0 +1,279 @@
+// First run: sign in with a Stremio account, beside a wall of posters.
+// Layout: .ai-docs/mockups/01-sign-in.html.
+
+import { Theme } from "theme.slint";
+import { Button, ButtonKind } from "atoms.slint";
+
+component Field inherits VerticalLayout {
+    in property <string> label;
+    in property <image> icon;
+    in property <InputType> input-type: InputType.text;
+    in property <bool> bad;
+    in-out property <string> text;
+    callback accepted();
+    forward-focus: input;
+    spacing: 6px;
+    Text {
+        text: root.label;
+        color: Theme.text-3;
+        font-size: Theme.fs-sm;
+        font-weight: 600;
+    }
+    Rectangle {
+        height: 50px;
+        border-radius: Theme.radius-md;
+        background: Theme.surface-2;
+        border-width: input.has-focus || root.bad ? 2px : 0px;
+        border-color: root.bad && !input.has-focus ? Theme.danger : Theme.accent;
+        HorizontalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: root.icon;
+                    width: 20px;
+                    height: 20px;
+                    colorize: Theme.text-3;
+                }
+            }
+            input := TextInput {
+                text <=> root.text;
+                input-type: root.input-type;
+                color: Theme.text;
+                font-size: Theme.fs-md;
+                vertical-alignment: center;
+                single-line: true;
+                selection-background-color: Theme.accent;
+                selection-foreground-color: Theme.accent-ink;
+                accepted => {
+                    root.accepted();
+                }
+            }
+        }
+    }
+}
+
+export component LoginScreen inherits Rectangle {
+    in-out property <string> email;
+    in-out property <string> password;
+    in property <string> error;
+    in property <bool> busy;
+    // Posters for the wall; any number, repeated to fill it.
+    in property <[image]> posters;
+    callback submit();
+    callback create-account();
+
+    public function focus-first() {
+        if (root.email == "") {
+            email-field.focus();
+        } else {
+            password-field.focus();
+        }
+    }
+
+    property <length> gap: 18px;
+    property <length> column: (wall.width + 80px - 4 * root.gap) / 5;
+
+    background: Theme.bg;
+    HorizontalLayout {
+        wall := Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+            for c in 5: Rectangle {
+                x: -40px + c * (root.column + root.gap);
+                y: mod(c, 2) == 1 ? -180px : -60px;
+                width: root.column;
+                for r in 6: Rectangle {
+                    y: r * (root.column * 1.5 + root.gap);
+                    height: root.column * 1.5;
+                    border-radius: Theme.radius-md;
+                    clip: true;
+                    background: Theme.surface-1;
+                    if root.posters.length > 0: Image {
+                        width: 100%;
+                        height: 100%;
+                        source: root.posters[mod(c * 6 + r * 7, root.posters.length)];
+                        image-fit: cover;
+                        opacity: 0.55;
+                    }
+                }
+            }
+            Rectangle {
+                background: @linear-gradient(90deg, #0b0c1000 40%, Theme.bg 100%);
+            }
+            Rectangle {
+                background: @linear-gradient(0deg, Theme.bg 0%, #0b0c1000 30%);
+            }
+            Rectangle {
+                background: @linear-gradient(180deg, #0b0c1099 0%, #0b0c1000 25%);
+            }
+        }
+        VerticalLayout {
+            width: 560px;
+            padding-left: 56px;
+            padding-right: 72px;
+            alignment: center;
+            spacing: 0px;
+            HorizontalLayout {
+                alignment: start;
+                padding-bottom: 40px;
+                Text {
+                    text: "anchor";
+                    color: Theme.text;
+                    font-size: 44px;
+                    font-weight: 800;
+                }
+                Text {
+                    text: ".";
+                    color: Theme.accent;
+                    font-size: 44px;
+                    font-weight: 800;
+                }
+            }
+            Text {
+                text: "Sign in with your Stremio account";
+                color: Theme.text;
+                font-size: Theme.fs-2xl;
+                font-weight: 800;
+                wrap: word-wrap;
+            }
+            Rectangle {
+                height: 10px;
+            }
+            Text {
+                text: "anchor uses the addons and library in your account, and saves what you watch back to it.";
+                color: Theme.text-2;
+                font-size: Theme.fs-md;
+                wrap: word-wrap;
+            }
+            Rectangle {
+                height: 30px;
+            }
+            email-field := Field {
+                label: "Email";
+                icon: @image-url("icons/mail.svg");
+                text <=> root.email;
+                accepted => {
+                    password-field.focus();
+                }
+            }
+            Rectangle {
+                height: 18px;
+            }
+            password-field := Field {
+                label: "Password";
+                icon: @image-url("icons/lock.svg");
+                input-type: InputType.password;
+                bad: root.error != "";
+                text <=> root.password;
+                accepted => {
+                    if (!root.busy) {
+                        root.submit();
+                    }
+                }
+            }
+            if root.error != "": HorizontalLayout {
+                padding-top: 10px;
+                spacing: 6px;
+                VerticalLayout {
+                    alignment: start;
+                    padding-top: 1px;
+                    Image {
+                        source: @image-url("icons/alert.svg");
+                        width: 16px;
+                        height: 16px;
+                        colorize: Theme.danger;
+                    }
+                }
+                Text {
+                    text: root.error;
+                    color: Theme.danger;
+                    font-size: Theme.fs-sm;
+                    font-weight: 600;
+                    wrap: word-wrap;
+                    horizontal-stretch: 1;
+                }
+            }
+            Rectangle {
+                height: 26px;
+            }
+            Button {
+                kind: ButtonKind.primary;
+                height: 50px;
+                text: root.busy ? "Signing in…" : "Sign in";
+                hint: root.busy ? "" : "Enter";
+                enabled: !root.busy && root.email != "" && root.password != "";
+                clicked => {
+                    root.submit();
+                }
+            }
+            HorizontalLayout {
+                padding-top: 22px;
+                spacing: 8px;
+                alignment: start;
+                Text {
+                    text: "No account yet?";
+                    color: Theme.text-2;
+                    font-size: Theme.fs-sm;
+                }
+                create := HorizontalLayout {
+                    spacing: 4px;
+                    Text {
+                        text: "Create one on stremio.com";
+                        color: create-touch.has-hover ? Theme.accent-hover : Theme.accent;
+                        font-size: Theme.fs-sm;
+                        font-weight: 600;
+                    }
+                    Image {
+                        source: @image-url("icons/external.svg");
+                        width: 14px;
+                        height: 14px;
+                        colorize: Theme.accent;
+                    }
+                    create-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.create-account();
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                height: 48px;
+            }
+            Rectangle {
+                height: 1px;
+                background: Theme.line;
+            }
+            VerticalLayout {
+                padding-top: 18px;
+                spacing: 6px;
+                for line[i] in [
+                    { icon: @image-url("icons/lock.svg"), text: "Only the login key is kept, in the system keychain. Your password is not stored." },
+                    { icon: @image-url("icons/info.svg"), text: "anchor is an independent client for the Stremio addon protocol. It is not made by Stremio." },
+                ]: HorizontalLayout {
+                    spacing: 8px;
+                    VerticalLayout {
+                        alignment: start;
+                        padding-top: 2px;
+                        Image {
+                            source: line.icon;
+                            width: 14px;
+                            height: 14px;
+                            colorize: Theme.text-3;
+                        }
+                    }
+                    Text {
+                        text: line.text;
+                        color: Theme.text-3;
+                        font-size: Theme.fs-xs;
+                        wrap: word-wrap;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+        }
+    }
+}

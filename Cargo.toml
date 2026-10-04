@@ -22,10 +22,15 @@ base64           = "0.23.1"
 camino           = "1.2"
 directories      = "6"
 flate2           = "1.1"
+# Slint decodes images with this crate. Listed to add WebP and GIF, and to
+# scale posters off the UI thread.
+image            = { version = "0.25", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
 # Stremio's dates: RFC 3339 timestamps.
 jiff             = { version = "0.2.37", features = ["serde"] }
 # Secret Service on Linux, Keychain on macOS.
 keyring          = "4.2.0"
+# Opens stremio.com in the browser.
+open             = "5.3"
 # Resource paths, as stremio-core encodes them.
 percent-encoding = "2.3"
 serde            = { version = "1", features = ["derive"] }
@@ -38,6 +43,10 @@ ureq             = { version = "3.4.2", default-features = false, features = ["g
 walkdir          = "2.5"
 # Finds mpv on the PATH.
 which            = "8"
+
+[features]
+# A tour of the screens without a display, saved as PNGs (src/snapshots.rs).
+snapshots = []
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"

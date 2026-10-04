@@ -1,0 +1,133 @@
+// What mpv is playing: the pill in the top bar and the bar at the foot of
+// the title's page. Layout: .ai-docs/mockups/06-series.html#playing.
+
+import { Theme } from "theme.slint";
+
+// Filled by the Rust side from mpv's IPC.
+export global NowPlaying {
+    in property <bool> active;
+    // On the pill, for example "S2 E4 · 31:10".
+    in property <string> label;
+    // For example "Small Thieves · S2 E4 The Pantry Job".
+    in property <string> title;
+    // The stream, for example "[TB⚡] 2160p".
+    in property <string> stream;
+    // For example "31:10 / 48:20".
+    in property <string> time;
+    in property <float> progress;
+    in property <image> still;
+    in property <bool> has-still;
+    // The pill: the title's page.
+    callback open();
+    // Quits mpv.
+    callback stop();
+}
+
+export component NowBar inherits Rectangle {
+    height: 76px;
+    background: Theme.surface-2;
+    drop-shadow-blur: 28px;
+    drop-shadow-offset-y: -10px;
+    drop-shadow-color: #00000066;
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 24px;
+        spacing: 18px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 96px;
+                height: 54px;
+                border-radius: Theme.radius-sm;
+                clip: true;
+                background: Theme.surface-3;
+                if NowPlaying.has-still: Image {
+                    width: 100%;
+                    height: 100%;
+                    source: NowPlaying.still;
+                    image-fit: cover;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text {
+                text: NowPlaying.title;
+                color: Theme.text;
+                font-size: Theme.fs-md;
+                font-weight: 600;
+                overflow: elide;
+            }
+            Text {
+                text: NowPlaying.stream;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                overflow: elide;
+            }
+            HorizontalLayout {
+                padding-top: 6px;
+                spacing: 12px;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        max-width: 520px;
+                        height: 3px;
+                        border-radius: 1.5px;
+                        background: #ffffff29;
+                        Rectangle {
+                            x: 0;
+                            width: parent.width * NowPlaying.progress;
+                            border-radius: 1.5px;
+                            background: Theme.accent;
+                        }
+                    }
+                }
+                Text {
+                    text: NowPlaying.time;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-xs;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: stop-row.preferred-width;
+                height: 38px;
+                border-radius: Theme.radius-md;
+                background: stop-touch.has-hover ? Theme.surface-3 : transparent;
+                stop-row := HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    spacing: 8px;
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("icons/stop.svg");
+                            width: 16px;
+                            height: 16px;
+                            colorize: Theme.text-2;
+                        }
+                    }
+                    Text {
+                        text: "Stop";
+                        color: stop-touch.has-hover ? Theme.text : Theme.text-2;
+                        font-size: Theme.fs-sm;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
+                stop-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        NowPlaying.stop();
+                    }
+                }
+            }
+        }
+    }
+}
