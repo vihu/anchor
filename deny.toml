@@ -1,0 +1,21 @@
+# License gate: every dependency must be compatible with GPL-3.0-or-later.
+# Run with `cargo deny check licenses`.
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    # webpki-roots: Mozilla's CA list; a permissive data licence, no copyleft.
+    "CDLA-Permissive-2.0",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "ISC",
+    "MIT",
+    # option-ext (via directories): file-level copyleft, GPL-3.0 compatible.
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]

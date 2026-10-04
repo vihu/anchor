@@ -1,0 +1,31 @@
+[package]
+description  = "A native Stremio client that plays through your own mpv"
+edition      = "2024"
+license      = "GPL-3.0-or-later"
+name         = "anchor"
+publish      = false
+rust-version = "1.93"
+version      = "0.1.0"
+
+[workspace]
+members = ["ui"]
+
+[workspace.dependencies]
+slint       = "1.18.1"
+slint-build = "1.18.1"
+
+[dependencies]
+# The window, compiled from `ui/` in a crate of its own.
+anchor-ui = { path = "ui" }
+slint     = { workspace = true }
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.6"
+
+# The builds in packaging/: link-time optimization and stripped symbols.
+# `cargo build --release` stays quick for development.
+[profile.dist]
+codegen-units = 1
+inherits      = "release"
+lto           = "fat"
+strip         = true

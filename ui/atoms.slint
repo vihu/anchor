@@ -1,0 +1,126 @@
+// Small building blocks shared by every screen.
+
+import { Theme } from "theme.slint";
+
+export enum ButtonKind { primary, secondary, ghost, danger }
+
+export component Button inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon;
+    in property <string> hint;
+    in property <ButtonKind> kind: ButtonKind.secondary;
+    in property <bool> enabled: true;
+    // Switched on, for example a favorite: the accent ink.
+    in property <bool> on;
+    callback clicked();
+
+    property <color> ink: kind == ButtonKind.primary ? Theme.accent-ink
+        : on ? Theme.accent
+        : kind == ButtonKind.danger ? Theme.danger
+        : kind == ButtonKind.ghost && !touch.has-hover ? Theme.text-2 : Theme.text;
+
+    height: 44px;
+    border-radius: Theme.radius-md;
+    opacity: enabled ? 1 : 0.45;
+    background: kind == ButtonKind.primary ? (touch.has-hover ? Theme.accent-hover : Theme.accent)
+        : kind == ButtonKind.secondary ? (touch.has-hover ? Theme.surface-4 : Theme.surface-3)
+        : kind == ButtonKind.danger ? (touch.has-hover ? #ff8a7a1a : transparent)
+        : (touch.has-hover ? Theme.surface-2 : transparent);
+
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 20px;
+        spacing: 10px;
+        alignment: center;
+        if root.has-icon: VerticalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                width: 20px;
+                height: 20px;
+                colorize: root.ink;
+            }
+        }
+        Text {
+            text: root.text;
+            color: root.ink;
+            font-size: Theme.fs-md;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+        if root.hint != "": Text {
+            text: root.hint;
+            color: root.ink;
+            opacity: 0.7;
+            font-size: Theme.fs-sm;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component Kbd inherits Rectangle {
+    in property <string> text;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 5px;
+    background: Theme.surface-3;
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        Text {
+            text: root.text;
+            color: Theme.text-2;
+            font-size: 11px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component Hint inherits HorizontalLayout {
+    in property <[string]> keys;
+    in property <string> label;
+    spacing: 6px;
+    for key in root.keys: VerticalLayout {
+        alignment: center;
+        Kbd {
+            text: key;
+        }
+    }
+    Text {
+        text: root.label;
+        color: Theme.text-3;
+        font-size: Theme.fs-sm;
+        vertical-alignment: center;
+    }
+}
+
+export component Tag inherits Rectangle {
+    in property <string> text;
+    in property <bool> on-image;
+    height: 22px;
+    border-radius: 5px;
+    background: on-image ? Theme.on-image : Theme.surface-3;
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        Text {
+            text: root.text;
+            color: root.on-image ? Theme.text : Theme.text-2;
+            font-size: 11px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+}

@@ -1,0 +1,14 @@
+[package]
+description  = "The anchor window, compiled from Slint"
+edition      = "2024"
+license      = "GPL-3.0-or-later"
+name         = "anchor-ui"
+publish      = false
+rust-version = "1.93"
+version      = "0.1.0"
+
+[dependencies]
+slint = { workspace = true }
+
+[build-dependencies]
+slint-build = { workspace = true }

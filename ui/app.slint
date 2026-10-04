@@ -1,0 +1,36 @@
+// The anchor window.
+
+import "fonts/SchibstedGrotesk.ttf";
+import { Theme } from "theme.slint";
+
+export component AppWindow inherits Window {
+    title: "anchor";
+    min-width: 1180px;
+    min-height: 720px;
+    preferred-width: 1440px;
+    preferred-height: 900px;
+    background: Theme.bg;
+    default-font-family: "Schibsted Grotesk";
+    default-font-size: Theme.fs-md;
+
+    HorizontalLayout {
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            HorizontalLayout {
+                Text {
+                    text: "anchor";
+                    color: Theme.text;
+                    font-size: Theme.fs-4xl;
+                    font-weight: 800;
+                }
+                Text {
+                    text: ".";
+                    color: Theme.accent;
+                    font-size: Theme.fs-4xl;
+                    font-weight: 800;
+                }
+            }
+        }
+    }
+}
