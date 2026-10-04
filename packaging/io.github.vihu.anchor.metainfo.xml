@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.vihu.anchor</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>anchor</name>
+  <summary>Browse your Stremio addons and watch in your own mpv</summary>
+  <developer id="io.github.vihu">
+    <name>vihu</name>
+  </developer>
+  <description>
+    <p>
+      anchor is a native Stremio client. Sign in with your Stremio account
+      and it shows your library and the catalogs of your addons, and plays
+      every stream in your own mpv, so your mpv.conf, scripts, shaders and
+      Dolby Vision handling apply.
+    </p>
+    <ul>
+      <li>Home opens on what you left unfinished, then a row per catalog</li>
+      <li>Every catalog of your addons in the sidebar, by genre, page by page</li>
+      <li>Search across every catalog that can search</li>
+      <li>Movie and series pages with seasons, episodes and watched marks</li>
+      <li>Your stream addon's list as it writes it, the last stream selected</li>
+      <li>Progress written back to your Stremio account as you watch</li>
+    </ul>
+    <p>
+      The login key stays in the system keychain. anchor brings no content
+      of its own: it plays what your addons offer. It needs mpv installed.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.vihu.anchor.desktop</launchable>
+  <url type="homepage">https://github.com/vihu/anchor</url>
+  <url type="bugtracker">https://github.com/vihu/anchor/issues</url>
+  <url type="vcs-browser">https://github.com/vihu/anchor</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#b8dbff</color>
+    <color type="primary" scheme_preference="dark">#0b3a6b</color>
+  </branding>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-05"/>
+  </releases>
+</component>

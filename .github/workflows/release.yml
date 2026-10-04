@@ -1,0 +1,115 @@
+name: Release
+
+# A `v*` tag builds the app for Linux and macOS and drafts a GitHub release
+# with the builds; publish it from the Releases page. Run it by hand
+# (Actions > Release > Run workflow) to build without releasing: the builds
+# are then the run's artifacts.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  appimage:
+    name: AppImage (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          # The Ubuntu it is built on sets the oldest glibc the AppImage
+          # runs on.
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig-dev libudev-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - run: packaging/appimage.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: appimage-${{ matrix.arch }}
+          path: target/dist/*.AppImage
+          if-no-files-found: error
+
+  macos:
+    name: macOS app (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - run: brew install librsvg
+      - run: packaging/macos.sh build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-${{ matrix.arch }}
+          path: target/dist/*.app.tar
+          if-no-files-found: error
+
+  macos-universal:
+    name: macOS app (universal)
+    needs: macos
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: macos-*
+          path: builds
+          merge-multiple: true
+      - run: packaging/macos.sh merge builds/anchor-arm64.app.tar builds/anchor-x86_64.app.tar
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-universal
+          path: target/dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Draft the release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [appimage, macos-universal]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the tag matches the version in Cargo.toml and the metainfo
+        run: |
+          version=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml)
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in Cargo.toml"
+            exit 1
+          fi
+          if ! grep -q "<release version=\"$version\"" packaging/io.github.vihu.anchor.metainfo.xml; then
+            echo "::error::no <release version=\"$version\"> in packaging/io.github.vihu.anchor.metainfo.xml"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      # The per-architecture macOS builds went into the universal one.
+      - run: rm -f dist/*.app.tar
+      - run: cd dist && sha256sum -- * > SHA256SUMS
+      - run: >-
+          gh release create "$GITHUB_REF_NAME" dist/*
+          --draft --verify-tag --generate-notes
+          --title "anchor ${GITHUB_REF_NAME#v}"
+        env:
+          GH_TOKEN: ${{ github.token }}

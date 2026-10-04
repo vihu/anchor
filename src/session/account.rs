@@ -160,7 +160,12 @@ impl Session {
                         s.apply(addons, library);
                         s.state.borrow_mut().synced_at = Some(jiff::Timestamp::now());
                         s.set_meta("synced");
-                        s.set_note("");
+                        let empty = s.state.borrow().sections.is_empty();
+                        s.set_note(if empty {
+                            "None of your addons has a catalog. Add one on web.stremio.com (AIOMetadata or Cinemeta, say), then Sync now in Settings."
+                        } else {
+                            ""
+                        });
                         s.fill_settings();
                     }
                     Err(e) if e.signed_out() => {

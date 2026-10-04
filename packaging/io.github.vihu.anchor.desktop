@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=anchor
+GenericName=Stremio Client
+Comment=Browse your Stremio addons and watch in your own mpv
+Exec=anchor
+Icon=io.github.vihu.anchor
+Terminal=false
+Categories=AudioVideo;Video;Player;
+Keywords=stremio;addons;movies;series;mpv;debrid;player;
+StartupWMClass=io.github.vihu.anchor
