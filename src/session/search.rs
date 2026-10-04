@@ -74,6 +74,14 @@ impl Session {
         }
     }
 
+    /// The addons changed: answers on their way are dropped, and the next
+    /// query asks the new catalogs.
+    pub(super) fn forget_search(&self) {
+        let mut state = self.state.borrow_mut();
+        state.search.generation += 1;
+        state.search.query.clear();
+    }
+
     /// The title result row `row` shows, if it is one.
     pub(super) fn search_preview(&self, row: i32) -> Option<MetaPreview> {
         let state = self.state.borrow();
@@ -168,6 +176,10 @@ impl Session {
             return;
         };
         let data = app.global::<SearchData>();
+        // The title chosen before late answers moved the rows.
+        let chosen = usize::try_from(data.get_index())
+            .ok()
+            .and_then(|row| *self.state.borrow().search.rows.get(row)?);
         let (urls, note) = {
             let mut state = self.state.borrow_mut();
             let state = &mut *state;
@@ -213,6 +225,8 @@ impl Session {
             } else {
                 ""
             };
+            let again = chosen.and_then(|at| rows.iter().position(|r| *r == Some(at)));
+            data.set_index(again.map_or(-1, |row| row as i32));
             state.search.rows = rows;
             state.search.items = Rc::new(VecModel::from(items));
             data.set_items(ModelRc::from(Rc::clone(&state.search.items)));

@@ -131,6 +131,19 @@ impl Api {
         Ok(lenient(Some(&result)))
     }
 
+    /// The library items with these ids, as the account has them now.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] when Stremio cannot be reached or refuses.
+    pub fn library_items(&self, key: &str, ids: &[&str]) -> Result<Vec<LibraryItem>> {
+        let result: Value = self.call(
+            "datastoreGet",
+            &json!({"authKey": key, "collection": LIBRARY, "ids": ids, "all": false}),
+        )?;
+        Ok(lenient(Some(&result)))
+    }
+
     /// Writes `items` to the account's library, replacing what it had for
     /// them.
     ///

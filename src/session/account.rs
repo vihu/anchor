@@ -112,6 +112,15 @@ impl Session {
     /// Signs out: ends the session at Stremio, forgets the key and what was
     /// cached, and shows the sign-in screen.
     pub(super) fn sign_out(self: &Rc<Self>) {
+        // mpv playing for this account: where it got to goes to this
+        // account, and it stops.
+        let playing = self.state.borrow_mut().playing.take();
+        if let Some(playing) = playing {
+            self.replace_playing(playing);
+            if let Some(app) = self.app.upgrade() {
+                app.global::<crate::ui::NowPlaying>().set_active(false);
+            }
+        }
         let account = {
             let mut state = self.state.borrow_mut();
             state.epoch += 1;
@@ -156,6 +165,10 @@ impl Session {
                 }
                 match result {
                     Ok((addons, library)) => {
+                        // Changes made here while the sync was on its way
+                        // stay.
+                        let local = s.state.borrow().library.clone();
+                        let library = anchor::library::merge(local, library);
                         s.cache(&addons, &library);
                         s.apply(addons, library);
                         s.state.borrow_mut().synced_at = Some(jiff::Timestamp::now());
@@ -196,15 +209,9 @@ impl Session {
                 eprintln!("cache: {e}");
             }
         }
-        let Some((key, _)) = self.key() else {
-            return;
-        };
-        let api = self.api.clone();
-        std::thread::spawn(move || {
-            if let Err(e) = api.put_library(&key, &[item]) {
-                eprintln!("library: {e}");
-            }
-        });
+        if let Some((key, _)) = self.key() {
+            self.writer.borrow().send(key, vec![item]);
+        }
     }
 
     /// The signed-in account's email.
@@ -235,11 +242,19 @@ impl Session {
     /// Takes `addons` and `library` as the account's.
     fn apply(self: &Rc<Self>, addons: Vec<Addon>, library: Vec<LibraryItem>) {
         let sources = Sources::new(addons);
-        {
+        let changed = {
             let mut state = self.state.borrow_mut();
+            let changed = state.sources != sources;
             state.sections = sources.sections();
             state.sources = sources;
             state.library = library;
+            changed
+        };
+        // Catalogs are known by their place: other addons, other places.
+        if changed {
+            self.forget_catalog();
+            self.forget_search();
+            self.light_catalog(-1, -1);
         }
         self.apply_sidebar();
         self.refresh_home();

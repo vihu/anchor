@@ -131,6 +131,25 @@ fn the_library_reads_and_writes_back() {
 }
 
 #[test]
+fn library_items_by_id() {
+    let mut server = Server::new();
+    let mock = server
+        .mock("POST", "/api/datastoreGet")
+        .match_body(Matcher::Json(json!({
+            "authKey": "k1", "collection": "libraryItem", "ids": ["tt1"], "all": false
+        })))
+        .with_body(r#"{"result":[]}"#)
+        .create();
+    assert!(
+        api(&server)
+            .library_items("k1", &["tt1"])
+            .unwrap()
+            .is_empty()
+    );
+    mock.assert();
+}
+
+#[test]
 fn logout() {
     let mut server = Server::new();
     let mock = server

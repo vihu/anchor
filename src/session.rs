@@ -15,6 +15,7 @@ mod settings;
 mod shell;
 mod streams;
 mod title;
+mod writer;
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -47,6 +48,7 @@ pub struct Session {
     art: RefCell<Art>,
     search_timer: Timer,
     toast_timer: Timer,
+    writer: RefCell<writer::Writer>,
 }
 
 /// What the session knows.
@@ -87,6 +89,7 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
         .load_settings()
         .inspect_err(|e| eprintln!("settings: {e}"))
         .unwrap_or_default();
+    let writer = writer::Writer::start(api.clone());
     let session = Rc::new(Session {
         app: app.as_weak(),
         paths,
@@ -97,6 +100,7 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
         art: RefCell::new(art),
         search_timer: Timer::default(),
         toast_timer: Timer::default(),
+        writer: RefCell::new(writer),
     });
     SESSION.with(|s| *s.borrow_mut() = Some(Rc::clone(&session)));
 
@@ -147,7 +151,10 @@ pub fn start(app: &AppWindow, paths: Paths, api: Api, addons: Addons) {
 /// Saves what is left to save before the window closes: the position of
 /// the title playing.
 pub fn finish() {
-    with_session(|s| s.finish_playing());
+    with_session(|s| {
+        s.finish_playing();
+        s.writer.borrow_mut().finish();
+    });
 }
 
 /// Runs `f` with the session, if the window still has one.

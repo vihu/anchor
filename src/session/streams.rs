@@ -255,10 +255,10 @@ impl Session {
         // A title already playing in another mpv is stopped.
         let previous = self.state.borrow_mut().playing.take();
         if let Some(previous) = previous {
-            previous.stop();
+            self.replace_playing(previous);
         }
         self.state.borrow_mut().panel.failed.remove(&at);
-        self.start_playing(Playing::new(token, playback, target, launch.start));
+        self.start_playing(Playing::new(token, playback, target));
         app.set_streams_open(false);
         app.invoke_focus_screen();
     }
@@ -266,6 +266,12 @@ impl Session {
     /// mpv could not play the stream last played for `target`: the panel
     /// again, the stream marked, with why.
     pub(super) fn stream_failed(self: &Rc<Self>, target: Target, why: &str) {
+        // Another page shows now: say so, without taking it over.
+        let here = self.state.borrow().page.as_ref().map(|p| p.id().to_owned());
+        if here.as_deref() != Some(target.meta_id.as_str()) {
+            self.toast(&format!("mpv could not play {} ({why})", target.name));
+            return;
+        }
         let start = {
             let mut state = self.state.borrow_mut();
             let last = self.paths.last_streams().get(&target.video_id).cloned();
@@ -298,6 +304,10 @@ impl Session {
             state.panel.target.as_ref().map(|t| t.video_id.clone())
         };
         let last = video.and_then(|v| self.paths.last_streams().remove(&v));
+        // The stream chosen before late answers moved the rows.
+        let chosen = usize::try_from(app.get_stream_index())
+            .ok()
+            .and_then(|row| *self.state.borrow().panel.rows.get(row)?);
         let (items, select, note) = {
             let mut state = self.state.borrow_mut();
             let panel = &mut state.panel;
@@ -374,18 +384,15 @@ impl Session {
         };
         app.set_streams(ModelRc::new(VecModel::from(items)));
         app.set_streams_note(note.into());
-        let current = app.get_stream_index();
-        let still_valid = usize::try_from(current).ok().is_some_and(|c| {
+        let again = chosen.and_then(|at| {
             self.state
                 .borrow()
                 .panel
                 .rows
-                .get(c)
-                .is_some_and(Option::is_some)
+                .iter()
+                .position(|r| *r == Some(at))
         });
-        if !still_valid {
-            app.set_stream_index(select.map_or(-1, |s| s as i32));
-        }
+        app.set_stream_index(again.or(select).map_or(-1, |s| s as i32));
         app.invoke_reveal_stream();
     }
 

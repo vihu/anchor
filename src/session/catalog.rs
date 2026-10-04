@@ -152,6 +152,13 @@ impl Session {
 }
 
 impl Session {
+    /// The addons changed: the catalog showing loads no more pages.
+    pub(super) fn forget_catalog(&self) {
+        let mut state = self.state.borrow_mut();
+        state.browse.generation += 1;
+        state.browse.at = None;
+    }
+
     /// Title `i` of the grid.
     pub(super) fn catalog_preview(&self, i: i32) -> Option<MetaPreview> {
         let state = self.state.borrow();

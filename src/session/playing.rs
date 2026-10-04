@@ -9,10 +9,11 @@ use std::time::{Duration, Instant};
 use anchor::addon::{MetaItem, MetaPreview};
 use anchor::library::{self, LibraryItem};
 use anchor::player::{Event, Outcome, Playback, Progress};
+use jiff::Timestamp;
 use slint::{ComponentHandle, SharedString, TimerMode};
 
 use super::streams::Target;
-use super::{Session, with_session};
+use super::{Session, spawn, with_session};
 use crate::art::Size;
 use crate::text;
 use crate::ui::NowPlaying;
@@ -29,28 +30,29 @@ pub(super) struct Playing {
     token: u64,
     playback: Playback,
     target: Target,
-    /// Where mpv was asked to start, in seconds.
-    start: Option<f64>,
     /// The last position mpv reported, and when.
     last: Progress,
     last_at: Instant,
     pushed_at: Instant,
     /// mpv reported a length: the stream plays.
     started: bool,
+    /// When the library item last changed before this playback, to tell
+    /// whether the account's copy is newer.
+    base: Option<Timestamp>,
 }
 
 impl Playing {
     /// The playback `token` names, started on `target`.
-    pub(super) fn new(token: u64, playback: Playback, target: Target, start: Option<f64>) -> Self {
+    pub(super) fn new(token: u64, playback: Playback, target: Target) -> Self {
         Self {
             token,
             playback,
             target,
-            start,
             last: Progress::default(),
             last_at: Instant::now(),
             pushed_at: Instant::now(),
             started: false,
+            base: None,
         }
     }
 
@@ -74,9 +76,31 @@ impl Session {
         state.tokens
     }
 
-    /// mpv started: the pill, the bar, and the page say so.
-    pub(super) fn start_playing(self: &Rc<Self>, playing: Playing) {
+    /// Another stream replaces `previous`: where it got to is saved, and
+    /// its mpv is asked to quit.
+    pub(super) fn replace_playing(&self, previous: Playing) {
+        self.wrap_up(&previous, previous.last);
+        previous.stop();
+    }
+
+    /// mpv started: the pill, the bar, and the page say so; the account's
+    /// copy of the title is fetched, in case another device moved it on.
+    pub(super) fn start_playing(self: &Rc<Self>, mut playing: Playing) {
         let target = playing.target.clone();
+        playing.base = self
+            .state
+            .borrow()
+            .library
+            .iter()
+            .find(|i| i.id == target.meta_id)
+            .map(|i| i.mtime);
+        if let Some((key, _)) = self.key() {
+            let (api, token, id) = (self.api.clone(), playing.token, target.meta_id.clone());
+            spawn(
+                move || api.library_items(&key, &[id.as_str()]).unwrap_or_default(),
+                move |s, items| s.fresh_item(token, items),
+            );
+        }
         let label = target.code.clone().unwrap_or_else(|| target.name.clone());
         self.state.borrow_mut().playing = Some(playing);
         if let Some(app) = self.app.upgrade() {
@@ -171,11 +195,8 @@ impl Session {
         if !playing.started {
             return;
         }
-        let item = self.apply_progress(&playing, playing.last);
-        if let (Some(item), Some((key, _))) = (item, self.key())
-            && let Err(e) = self.api.put_library(&key, &[item])
-        {
-            eprintln!("library: {e}");
+        if let Some(item) = self.apply_progress(&playing, playing.last) {
+            self.keep_item(item, true);
         }
     }
 
@@ -277,7 +298,10 @@ impl Session {
             return;
         }
         if playing.started {
-            let finished = outcome == Outcome::Finished;
+            // mpv also says the file ended when a stream drops: only the
+            // credits count as finishing it.
+            let finished = outcome == Outcome::Finished
+                && last.position >= last.duration * library::CREDITS_THRESHOLD;
             let last = if finished {
                 Progress {
                     position: last.duration,
@@ -286,11 +310,7 @@ impl Session {
             } else {
                 last
             };
-            if let Some(mut item) = self.apply_progress(&playing, last) {
-                let next = self.next_video(&target);
-                item.stopped(next.as_deref(), library::now());
-                self.keep_item(item, true);
-            }
+            self.wrap_up(&playing, last);
             let what = target.code.clone().unwrap_or_else(|| target.name.clone());
             self.toast(&if finished {
                 format!("Finished {what} · saved to your Stremio account")
@@ -303,6 +323,56 @@ impl Session {
         }
         self.show_playing();
         self.refresh_home();
+    }
+
+    /// Saves where `playing` stopped, at `last`: the library item moves on as
+    /// Stremio's rules say (the next episode when this one is done), and
+    /// goes to the account.
+    fn wrap_up(&self, playing: &Playing, last: Progress) {
+        if !playing.started {
+            return;
+        }
+        if let Some(mut item) = self.apply_progress(playing, last) {
+            let next = self.next_video(&playing.target);
+            item.stopped(next.as_deref(), library::now());
+            self.keep_item(item, true);
+        }
+    }
+
+    /// The account's copy of the title playing arrived: when another device
+    /// moved it on since the last sync, playing carries on from that.
+    fn fresh_item(&self, token: u64, items: Vec<LibraryItem>) {
+        let Some(mut remote) = items.into_iter().next() else {
+            return;
+        };
+        let item = {
+            let state = self.state.borrow();
+            let Some(playing) = state.playing.as_ref().filter(|p| p.token == token) else {
+                return;
+            };
+            // Newer than the copy this playback started from: the account
+            // moved on elsewhere. Playing carries on from its copy, at the
+            // position mpv is at.
+            if playing.base.is_some_and(|base| remote.mtime <= base) {
+                return;
+            }
+            if playing.last.duration > 0.0 {
+                let ids = state
+                    .metas
+                    .get(&playing.target.meta_id)
+                    .map(MetaItem::bitfield_ids)
+                    .unwrap_or_default();
+                remote.started(
+                    &playing.target.video_id,
+                    millis(playing.last.position),
+                    millis(playing.last.duration),
+                    &ids,
+                    library::now(),
+                );
+            }
+            remote
+        };
+        self.keep_item(item, false);
     }
 
     /// The library item after `progress`: a seek moves the resume point, a
@@ -321,23 +391,38 @@ impl Session {
             .iter()
             .find(|i| i.id == target.meta_id)
             .cloned()
-            .or_else(|| meta.map(|m| LibraryItem::new(&m.preview, now)))?;
+            .unwrap_or_else(|| {
+                let preview = meta.map_or_else(
+                    || MetaPreview {
+                        id: target.meta_id.clone(),
+                        kind: target.kind.clone(),
+                        name: target.name.clone(),
+                        ..MetaPreview::default()
+                    },
+                    |m| m.preview.clone(),
+                );
+                LibraryItem::new(&preview, now)
+            });
         let (time, duration) = (millis(progress.position), millis(progress.duration));
+        // Without the metadata the episodes' order is unknown: the watched
+        // marks are then left alone.
         let ids = meta.map(MetaItem::bitfield_ids).unwrap_or_default();
-        let elapsed = playing.last_at.elapsed().as_secs_f64();
-        let jumped = if playing.started && playing.last.duration > 0.0 {
+        if playing.last.duration <= 0.0 {
+            // The first report: the item points at this video, from here.
+            item.started(&target.video_id, time, duration, &ids, now);
+        } else {
+            // Paused, no time passes: any move is a seek.
+            let allowed = if playing.last.paused {
+                0.0
+            } else {
+                playing.last_at.elapsed().as_secs_f64()
+            };
             let moved = progress.position - playing.last.position;
-            moved > elapsed + SEEK_SLACK || moved < -1.0
-        } else {
-            // The first report: where mpv was asked to start is no seek.
-            playing
-                .start
-                .is_some_and(|start| (progress.position - start).abs() > SEEK_SLACK)
-        };
-        if jumped {
-            item.seek(time, duration, now);
-        } else {
-            item.time_changed(&target.video_id, time, duration, &ids, now);
+            if moved > allowed + SEEK_SLACK || moved < -1.0 {
+                item.seek(time, duration, now);
+            } else {
+                item.time_changed(&target.video_id, time, duration, &ids, now);
+            }
         }
         Some(item)
     }

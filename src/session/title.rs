@@ -45,6 +45,10 @@ impl Page {
     pub(super) fn target(&self, episode: i32, now: Timestamp) -> Option<Target> {
         let preview = self.meta.as_ref().map_or(&self.preview, |m| &m.preview);
         let year = text::year(preview.release_info.as_deref());
+        // A series' episodes are known only from its metadata.
+        if self.meta.is_none() && preview.kind != "movie" {
+            return None;
+        }
         if self.seasons.is_empty() {
             let video_id = self
                 .meta
@@ -121,6 +125,8 @@ impl Session {
         });
         app.set_back_label(origin.1.as_str().into());
         app.set_title_episode_index(-1);
+        // The panel belonged to the page before.
+        app.set_streams_open(false);
         self.light_catalog(-1, -1);
         match known {
             Some(meta) => self.page_meta_ready(&meta),
@@ -138,6 +144,7 @@ impl Session {
         let Some(app) = self.app.upgrade() else {
             return;
         };
+        app.set_streams_open(false);
         match origin {
             Some((Screen::Catalog, _)) => {
                 app.set_back_label(SharedString::new());

@@ -18,7 +18,7 @@ use crate::watched::Watched;
 const WATCHED_THRESHOLD: f64 = 0.7;
 /// Past this share of a video's length, stopping counts as finishing it:
 /// what is left are the credits.
-const CREDITS_THRESHOLD: f64 = 0.9;
+pub const CREDITS_THRESHOLD: f64 = 0.9;
 /// Continue watching shows at most this many titles.
 const CONTINUE_WATCHING_MAX: usize = 100;
 /// Removed items stay in sync for a year.
@@ -203,6 +203,24 @@ impl LibraryItem {
         }
     }
 
+    /// mpv's first report of a playback, `time` milliseconds into
+    /// `video_id`: the item points at that video from where it plays,
+    /// whatever it pointed at before (another episode, or this one further
+    /// on before a restart from the beginning).
+    pub fn started(
+        &mut self,
+        video_id: &str,
+        time: u64,
+        duration: u64,
+        video_ids: &[String],
+        now: Timestamp,
+    ) {
+        self.time_changed(video_id, time, duration, video_ids, now);
+        if self.state.time_offset != time {
+            self.seek(time, duration, now);
+        }
+    }
+
     /// mpv reports `time` milliseconds into `video_id`, `duration` long:
     /// counts the time watched and, past 70 %, marks the video watched.
     ///
@@ -248,9 +266,13 @@ impl LibraryItem {
         {
             self.state.flagged_watched = 1;
             self.state.times_watched = self.state.times_watched.saturating_add(1);
-            let mut watched = self.watched_videos(video_ids.to_vec());
-            watched.set(&video_id, true);
-            self.state.watched = Some(watched.serialize());
+            // Without the title's videos the field cannot be read: left as
+            // it is, as stremio-core leaves it.
+            if !video_ids.is_empty() {
+                let mut watched = self.watched_videos(video_ids.to_vec());
+                watched.set(&video_id, true);
+                self.state.watched = Some(watched.serialize());
+            }
         }
         if self.temp && self.state.times_watched == 0 {
             self.removed = true;
@@ -308,6 +330,9 @@ impl LibraryItem {
         video_ids: &[String],
         now: Timestamp,
     ) {
+        if video_ids.is_empty() {
+            return;
+        }
         let mut field = self.watched_videos(video_ids.to_vec());
         field.set(&video.id, watched);
         self.state.watched = Some(field.serialize());
@@ -331,6 +356,20 @@ pub fn now() -> Timestamp {
     Timestamp::now()
         .round(jiff::Unit::Millisecond)
         .expect("rounding the present to the millisecond stays in range")
+}
+
+/// The account's library merged with the copy here: by title, the newer
+/// item wins, so a change made while a sync was on its way survives it.
+pub fn merge(local: Vec<LibraryItem>, remote: Vec<LibraryItem>) -> Vec<LibraryItem> {
+    let mut merged = remote;
+    for item in local {
+        match merged.iter_mut().find(|i| i.id == item.id) {
+            Some(slot) if item.mtime > slot.mtime => *slot = item,
+            Some(_) => {}
+            None => merged.push(item),
+        }
+    }
+    merged
 }
 
 /// The titles in Continue watching: latest first, at most 100.
@@ -486,6 +525,62 @@ mod tests {
     }
 
     #[test]
+    fn a_new_episode_starts_from_where_it_plays() {
+        let mut item = LibraryItem::new(&meta(), now());
+        let ids = episodes();
+        for minute in [0, 30] {
+            item.time_changed("tt0903747:1:1", minute * MINUTE, 45 * MINUTE, &ids, now());
+        }
+        item.stopped(Some("tt0903747:1:2"), now());
+        // Episode 1 stopped at 30 of 45; the next one is played from its
+        // start instead.
+        let mut other = item.clone();
+        other.started("tt0903747:1:3", 0, 47 * MINUTE, &ids, now());
+        for minute in 1..=10 {
+            other.time_changed("tt0903747:1:3", minute * MINUTE, 47 * MINUTE, &ids, now());
+        }
+        assert_eq!(other.state.video_id.as_deref(), Some("tt0903747:1:3"));
+        assert_eq!(other.state.time_offset, 10 * MINUTE);
+        assert_eq!(other.state.duration, 47 * MINUTE);
+        assert_eq!(other.state.time_watched, 10 * MINUTE);
+    }
+
+    #[test]
+    fn a_restart_moves_the_resume_point_back() {
+        let mut item = LibraryItem::new(&meta(), now());
+        let ids = episodes();
+        for minute in [0, 30] {
+            item.time_changed("tt0903747:1:1", minute * MINUTE, 45 * MINUTE, &ids, now());
+        }
+        item.started("tt0903747:1:1", 0, 45 * MINUTE, &ids, now());
+        assert_eq!(item.resume_at("tt0903747:1:1"), None, "from the beginning");
+        item.time_changed("tt0903747:1:1", 5 * MINUTE, 45 * MINUTE, &ids, now());
+        assert_eq!(item.state.time_offset, 5 * MINUTE);
+    }
+
+    #[test]
+    fn without_the_videos_the_watched_field_stays() {
+        let mut item = LibraryItem::new(&meta(), now());
+        let ids = episodes();
+        let mut watched = Watched::none(ids.clone());
+        watched.set("tt0903747:1:1", true);
+        watched.set("tt0903747:1:2", true);
+        let field = watched.serialize();
+        item.state.watched = Some(field.clone());
+        for minute in 0..=40 {
+            item.time_changed("tt0903747:1:3", minute * MINUTE, 45 * MINUTE, &[], now());
+        }
+        assert_eq!(item.state.flagged_watched, 1);
+        assert_eq!(item.state.watched.as_deref(), Some(field.as_str()));
+        let video = Video {
+            id: "tt0903747:1:4".into(),
+            ..Video::default()
+        };
+        item.mark_video_watched(&video, true, &[], now());
+        assert_eq!(item.state.watched.as_deref(), Some(field.as_str()));
+    }
+
+    #[test]
     fn a_seek_is_not_watched_time() {
         let mut item = LibraryItem::new(&meta(), now());
         let ids = episodes();
@@ -590,6 +685,38 @@ mod tests {
         let json = serde_json::to_string(&now()).unwrap();
         let fraction = json.trim_matches('"').split('.').nth(1).unwrap_or("Z");
         assert!(fraction.len() <= 4, "{json}");
+    }
+
+    #[test]
+    fn merging_keeps_the_newer_item() {
+        let base: LibraryItem = serde_json::from_str(FROM_ACCOUNT).unwrap();
+        let at = |id: &str, mtime: &str| LibraryItem {
+            id: id.into(),
+            mtime: mtime.parse().unwrap(),
+            ..base.clone()
+        };
+        let local = vec![
+            at("a", "2026-10-04T12:00:00Z"),
+            at("b", "2026-10-01T00:00:00Z"),
+            at("here", "2026-10-04T00:00:00Z"),
+        ];
+        let remote = vec![
+            at("a", "2026-10-02T00:00:00Z"),
+            at("b", "2026-10-03T00:00:00Z"),
+        ];
+        let merged = merge(local, remote);
+        let times: Vec<(String, String)> = merged
+            .iter()
+            .map(|i| (i.id.clone(), i.mtime.to_string()))
+            .collect();
+        assert_eq!(
+            times,
+            [
+                ("a".into(), "2026-10-04T12:00:00Z".into()),
+                ("b".into(), "2026-10-03T00:00:00Z".into()),
+                ("here".into(), "2026-10-04T00:00:00Z".into()),
+            ]
+        );
     }
 
     #[test]
