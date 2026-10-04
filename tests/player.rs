@@ -69,8 +69,11 @@ fn plays_to_the_end() {
     );
     let args = std::fs::read_to_string(dir.path().join("args")).unwrap();
     assert!(args.contains("--start=30.0\n"), "{args}");
+    // The URL only ever goes over the socket.
+    let (command_line, ipc) = args.split_once("ipc ").unwrap();
+    assert!(!command_line.contains("debrid.example"), "{args}");
     assert!(
-        args.ends_with("--\nhttps://debrid.example/dl/1\n"),
+        ipc.contains(r#"["loadfile", "https://debrid.example/dl/1"]"#),
         "{args}"
     );
 }

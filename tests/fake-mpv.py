@@ -4,7 +4,8 @@ way mpv does, reports a position and a length, and ends the way
 --fake-end= says: "eof" plays to the end, "quit" waits for anchor's quit
 command, "error" fails like a refused debrid link, "early" exits before
 opening the socket. --fake-args= names a file the arguments are written
-to, one per line. Both come in as the user's extra arguments."""
+to, one per line, then the IPC commands it got. Both come in as the user's
+extra arguments."""
 
 import json
 import os
@@ -34,10 +35,21 @@ server.bind(path)
 server.listen(1)
 conn, _ = server.accept()
 reader = conn.makefile("r")
-observed = {}
-for _ in range(3):
+# anchor hands over the stream (headers, then the URL) and observes three
+# properties, in any order; what came over the socket goes to the args file.
+observed, loaded = {}, False
+while len(observed) < 3 or not loaded:
     command = json.loads(reader.readline())["command"]
-    observed[command[2]] = command[1]
+    if command[0] == "observe_property":
+        observed[command[2]] = command[1]
+    elif command[0] == "loadfile":
+        loaded = True
+    elif command[0] == "quit":
+        conn.close()
+        sys.exit(0)
+    if option("--fake-args"):
+        with open(option("--fake-args"), "a") as f:
+            f.write("ipc " + json.dumps(command) + "\n")
     conn.sendall(b'{"request_id":0,"error":"success"}\n')
 
 

@@ -3,8 +3,10 @@
 //!
 //! anchor draws no video. mpv opens its own window with the user's
 //! `mpv.conf`, scripts and shaders, so picture (Dolby Vision included),
-//! sound and on-screen controls are mpv's. Stream URLs carry debrid keys,
-//! so none is ever logged or put in an error.
+//! sound and on-screen controls are mpv's. Stream URLs and their headers
+//! carry debrid keys, so none is ever logged or put in an error, nor put on
+//! mpv's command line, which other users can read: mpv starts idle and gets
+//! them over its socket.
 
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::os::unix::net::UnixStream;
@@ -24,7 +26,9 @@ const MACOS_PLACES: [&str; 3] = [
     "/usr/local/bin/mpv",
     "/Applications/mpv.app/Contents/MacOS/mpv",
 ];
-/// How long mpv gets to open its IPC socket.
+/// The IPC command that quits mpv.
+const QUIT: &str = "{\"command\":[\"quit\"]}\n";
+/// How long mpv gets to open its IPC socket, and to quit when asked.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 /// Between attempts to connect to the socket, and between checks on the
 /// process.
@@ -115,6 +119,7 @@ impl Playback {
     ) -> Result<Self, Error> {
         let socket_path = socket_path();
         let _ = std::fs::remove_file(&socket_path);
+        let load = load_commands(launch);
         let mut child = Command::new(mpv)
             .args(args(launch, &socket_path))
             .stdin(Stdio::null())
@@ -128,7 +133,9 @@ impl Playback {
             socket: Arc::new(Mutex::new(None)),
         };
         let (stop, socket) = (Arc::clone(&playback.stop), Arc::clone(&playback.socket));
-        thread::spawn(move || supervise(child, &socket_path, &stop, &socket, stderr, &events));
+        thread::spawn(move || {
+            supervise(child, &socket_path, &load, &stop, &socket, stderr, &events);
+        });
         Ok(playback)
     }
 
@@ -141,7 +148,7 @@ impl Playback {
             .unwrap_or_else(PoisonError::into_inner)
             .as_mut()
         {
-            let _ = stream.write_all(b"{\"command\":[\"quit\"]}\n");
+            let _ = stream.write_all(QUIT.as_bytes());
         }
     }
 }
@@ -180,10 +187,12 @@ pub fn version(mpv: &Utf8Path) -> Option<String> {
 }
 
 /// The arguments anchor starts mpv with, the user's extra ones after its
-/// own and the URL last.
+/// own. No stream URL and no header: [`load_commands`] sends those.
 pub fn args(launch: &Launch, socket: &Utf8Path) -> Vec<String> {
     let mut args = vec![
         format!("--input-ipc-server={socket}"),
+        // Wait for the stream over the socket, and quit after it.
+        "--idle=once".to_owned(),
         // A window at once: a debrid link can take seconds to open.
         "--force-window=immediate".to_owned(),
         format!("--force-media-title={}", launch.title),
@@ -191,18 +200,29 @@ pub fn args(launch: &Launch, socket: &Utf8Path) -> Vec<String> {
     if let Some(start) = launch.start.filter(|s| *s > 0.0) {
         args.push(format!("--start={start:.1}"));
     }
-    // The -append forms take one value each, so commas and colons in a
-    // URL or a header are not split.
-    for (name, value) in &launch.headers {
-        args.push(format!("--http-header-fields-append={name}: {value}"));
-    }
+    // The -append form takes one value each, so commas and colons in a URL
+    // are not split.
     for subtitle in &launch.subtitles {
         args.push(format!("--sub-files-append={subtitle}"));
     }
     args.extend(launch.extra_args.iter().cloned());
-    args.push("--".to_owned());
-    args.push(launch.url.clone());
     args
+}
+
+/// The IPC commands that hand mpv the stream: its headers, then the URL.
+pub fn load_commands(launch: &Launch) -> Vec<String> {
+    let mut commands = Vec::new();
+    if !launch.headers.is_empty() {
+        let fields: Vec<String> = launch
+            .headers
+            .iter()
+            .map(|(name, value)| format!("{name}: {value}"))
+            .collect();
+        commands
+            .push(serde_json::json!({"command": ["set_property", "http-header-fields", fields]}));
+    }
+    commands.push(serde_json::json!({"command": ["loadfile", launch.url]}));
+    commands.iter().map(|c| format!("{c}\n")).collect()
 }
 
 /// Splits the user's extra arguments as a shell would; `None` when the
@@ -263,17 +283,33 @@ struct Shared {
 fn supervise(
     mut child: Child,
     socket_path: &Utf8Path,
+    load: &[String],
     stop: &AtomicBool,
     socket: &Mutex<Option<UnixStream>>,
     stderr: Option<thread::JoinHandle<Vec<String>>>,
     events: &(dyn Fn(Event) + Send),
 ) {
     let mut shared = Shared::default();
-    if let Some(stream) = connect(socket_path, &mut child, stop) {
-        if let Ok(clone) = stream.try_clone() {
-            *socket.lock().unwrap_or_else(PoisonError::into_inner) = Some(clone);
+    match connect(socket_path, &mut child, stop) {
+        Some(mut stream) => {
+            if let Ok(clone) = stream.try_clone() {
+                *socket.lock().unwrap_or_else(PoisonError::into_inner) = Some(clone);
+            }
+            // A stop that came before the socket was kept never reached
+            // mpv: it goes now, instead of the stream.
+            let first: Vec<String> = if stop.load(Ordering::Relaxed) {
+                vec![QUIT.to_owned()]
+            } else {
+                load.to_vec()
+            };
+            if first.iter().all(|c| stream.write_all(c.as_bytes()).is_ok()) {
+                follow(stream, &mut shared, stop, events);
+            }
         }
-        follow(stream, &mut shared, events);
+        // No socket: an idle mpv would wait for ever.
+        None => {
+            let _ = child.kill();
+        }
     }
     let status = wait(&mut child, stop);
     socket.lock().unwrap_or_else(PoisonError::into_inner).take();
@@ -343,7 +379,12 @@ struct Message {
 /// The position moves every frame, so it is reported at most every
 /// [`REPORT_EVERY`]; one held back is reported once mpv goes quiet, so a
 /// pause shows where it stopped.
-fn follow(mut stream: UnixStream, state: &mut Shared, events: &(dyn Fn(Event) + Send)) {
+fn follow(
+    mut stream: UnixStream,
+    state: &mut Shared,
+    stop: &AtomicBool,
+    events: &(dyn Fn(Event) + Send),
+) {
     for (id, name) in [
         (TIME_POS, "time-pos"),
         (DURATION, "duration"),
@@ -359,12 +400,20 @@ fn follow(mut stream: UnixStream, state: &mut Shared, events: &(dyn Fn(Event) + 
     let mut line = Vec::new();
     let mut reported = Instant::now() - REPORT_EVERY;
     let mut held = false;
+    let mut stopped_at: Option<Instant> = None;
     loop {
         match reader.read_until(b'\n', &mut line) {
             Ok(0) => return,
             Ok(_) => {}
             // Quiet: what was held back goes out; a partial line stays.
             Err(e) if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
+                // Asked to quit and still talking: give up on it, and let
+                // the supervisor kill it.
+                if stop.load(Ordering::Relaxed)
+                    && stopped_at.get_or_insert_with(Instant::now).elapsed() > CONNECT_TIMEOUT
+                {
+                    return;
+                }
                 if held {
                     held = false;
                     reported = Instant::now();
@@ -422,14 +471,16 @@ fn follow(mut stream: UnixStream, state: &mut Shared, events: &(dyn Fn(Event) + 
 fn keep_tail(stderr: impl Read + Send + 'static) -> thread::JoinHandle<Vec<String>> {
     thread::spawn(move || {
         let mut lines = Vec::new();
-        for line in BufReader::new(stderr).lines() {
-            let Ok(line) = line else {
-                break;
-            };
+        let mut reader = BufReader::new(stderr);
+        let mut line = Vec::new();
+        // Bytes, not text: a line that is not UTF-8 must not stop the
+        // draining, or mpv blocks on a full pipe.
+        while reader.read_until(b'\n', &mut line).is_ok_and(|n| n > 0) {
             if lines.len() == STDERR_LINES {
                 lines.remove(0);
             }
-            lines.push(line);
+            lines.push(String::from_utf8_lossy(&line).trim_end().to_owned());
+            line.clear();
         }
         lines
     })
@@ -489,7 +540,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn args_put_anchors_first_and_the_url_last() {
+    fn args_keep_the_stream_off_the_command_line() {
         let launch = Launch {
             url: "https://debrid.example/dl/abc,def".into(),
             title: "Small Thieves · S2 E4".into(),
@@ -503,14 +554,20 @@ mod tests {
             args,
             [
                 "--input-ipc-server=/run/user/1000/anchor.sock",
+                "--idle=once",
                 "--force-window=immediate",
                 "--force-media-title=Small Thieves · S2 E4",
                 "--start=1830.2",
-                "--http-header-fields-append=Referer: https://a.example/x,y",
                 "--sub-files-append=https://subs.example/1.srt",
                 "--fs",
-                "--",
-                "https://debrid.example/dl/abc,def",
+            ]
+        );
+        // The URL and the headers carry keys: over the socket only.
+        assert_eq!(
+            load_commands(&launch),
+            [
+                "{\"command\":[\"set_property\",\"http-header-fields\",[\"Referer: https://a.example/x,y\"]]}\n",
+                "{\"command\":[\"loadfile\",\"https://debrid.example/dl/abc,def\"]}\n",
             ]
         );
     }
