@@ -121,6 +121,19 @@ impl std::fmt::Display for Error {
     }
 }
 
+/// The items of `list` that parse; the rest are skipped, so one item an
+/// addon or the API gets wrong does not cost the whole answer.
+pub(crate) fn lenient<T: DeserializeOwned>(list: Option<&serde_json::Value>) -> Vec<T> {
+    list.and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| T::deserialize(item).ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn read<T: DeserializeOwned>(body: &mut ureq::Body) -> Result<T> {
     let text = body
         .with_config()

@@ -1,4 +1,5 @@
-//! The addon client against real public addons, Cinemeta and OpenSubtitles:
+//! The addon and API clients against the real services (Cinemeta,
+//! OpenSubtitles, the Stremio API without an account):
 //! `cargo test --test live -- --ignored` (needs the network).
 
 use anchor::addon::{Addon, Addons, Manifest};
@@ -61,4 +62,18 @@ fn opensubtitles_for_a_movie_and_an_episode() {
         )
         .unwrap();
     assert!(!episode.is_empty());
+}
+
+#[test]
+#[ignore = "needs the network"]
+fn stremio_api_refuses_unknown_accounts_and_keys() {
+    use anchor::api::{Api, Error};
+    let api = Api::new(Client::new());
+    match api.login("nobody-anchor-test@example.invalid", "not the password") {
+        Err(Error::Api { code, message }) => assert!(code > 0 && !message.is_empty()),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+    let error = api.addons("not-a-key").unwrap_err();
+    assert!(error.signed_out(), "{error}");
+    assert!(api.library("not-a-key").unwrap_err().signed_out());
 }

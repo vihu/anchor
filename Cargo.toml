@@ -43,6 +43,8 @@ which            = "8"
 tikv-jemallocator = "0.6"
 
 [dev-dependencies]
+# A stand-in Stremio API for the client's tests.
+mockito  = "1.7.2"
 tempfile = "3.27"
 
 # The builds in packaging/: link-time optimization and stripped symbols.

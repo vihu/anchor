@@ -13,7 +13,7 @@ use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::net::{self, Client};
+use crate::net::{self, Client, lenient};
 
 /// The end of an addon's transport URL, which a resource's path replaces.
 const MANIFEST: &str = "/manifest.json";
@@ -672,18 +672,6 @@ fn text_or_number<'de, D: serde::Deserializer<'de>>(
         Value::Number(number) => Some(number.to_string()),
         _ => None,
     })
-}
-
-/// The items of `list` that parse; the rest are skipped.
-fn lenient<T: serde::de::DeserializeOwned>(list: Option<&Value>) -> Vec<T> {
-    list.and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| T::deserialize(item).ok())
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 fn lenient_list<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
