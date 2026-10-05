@@ -303,15 +303,22 @@ impl Session {
             let preview = meta.map_or(&page.preview, |m| &m.preview);
             let item = library.iter().find(|i| i.id == preview.id);
             let series = !page.seasons.is_empty();
-            let backdrop = preview.background.clone();
+            let backdrop = preview
+                .background
+                .clone()
+                .or_else(|| page.preview.background.clone());
             let poster = preview
                 .poster
                 .clone()
                 .or_else(|| page.preview.poster.clone());
             let current = app.get_title_details();
             let same_backdrop = backdrop.is_some() && backdrop == page.backdrop;
-            page.backdrop.clone_from(&backdrop);
             let same_poster = poster.is_some() && poster == page.poster;
+            // On the same page a new picture replaces the one showing when it
+            // arrives; a new page starts without.
+            let keep_backdrop = same_backdrop || page.backdrop.is_some();
+            let keep_poster = same_poster || page.poster.is_some();
+            page.backdrop.clone_from(&backdrop);
             page.poster.clone_from(&poster);
             // A movie shows its cast and details below; the credits
             // line names them otherwise.
@@ -350,18 +357,18 @@ impl Session {
                 facts: ModelRc::new(VecModel::from(facts)),
                 awards: awards.into(),
                 tint: text::tint(&preview.id),
-                poster: if same_poster {
+                poster: if keep_poster {
                     current.poster
                 } else {
                     Image::default()
                 },
-                has_poster: same_poster && current.has_poster,
-                backdrop: if same_backdrop {
+                has_poster: keep_poster && current.has_poster,
+                backdrop: if keep_backdrop {
                     current.backdrop
                 } else {
                     Image::default()
                 },
-                has_backdrop: same_backdrop && current.has_backdrop,
+                has_backdrop: keep_backdrop && current.has_backdrop,
                 note: if meta.is_none() {
                     "Loading…".into()
                 } else {

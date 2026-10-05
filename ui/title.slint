@@ -290,21 +290,35 @@ export component TitleScreen inherits Rectangle {
                 max-height: root.series ? root.hero-height : 100000px;
                 clip: true;
                 // The backdrop, faded into the page on the left and below.
-                if root.details.has-backdrop: Rectangle {
+                // The poster shows until it comes, then it fades in over
+                // it; a new page drops both at once.
+                Rectangle {
                     x: parent.width * 0.22;
                     width: parent.width * 0.78;
+                    opacity: 0;
+                    states [
+                        shown when root.details.has-backdrop: {
+                            opacity: 1;
+                            in {
+                                animate opacity {
+                                    duration: 400ms;
+                                    easing: ease-in-out;
+                                }
+                            }
+                        }
+                    ]
                     Image {
                         width: 100%;
                         height: 100%;
                         source: root.details.backdrop;
                         image-fit: cover;
                     }
-                    // Two stops: a stop between them draws a seam in Slint's
-                    // software renderer.
                     // A movie's larger type sits further over the picture.
                     if !root.series: Rectangle {
                         background: #0b0c104d;
                     }
+                    // Two stops: a stop between them draws a seam in Slint's
+                    // software renderer.
                     Rectangle {
                         background: @linear-gradient(90deg, Theme.bg 0%, #0b0c1000 60%);
                     }
@@ -313,7 +327,7 @@ export component TitleScreen inherits Rectangle {
                     }
                 }
                 // Without one, the poster stands on the right.
-                if !root.details.has-backdrop: Rectangle {
+                Rectangle {
                     height: min(parent.height - 96px, 600px);
                     width: self.height / 1.5;
                     x: parent.width - self.width - 64px;
@@ -321,6 +335,17 @@ export component TitleScreen inherits Rectangle {
                     border-radius: Theme.radius-lg;
                     clip: true;
                     background: @linear-gradient(180deg, root.details.tint 0%, Theme.surface-1 100%);
+                    states [
+                        hidden when root.details.has-backdrop: {
+                            opacity: 0;
+                            in {
+                                animate opacity {
+                                    duration: 400ms;
+                                    easing: ease-in-out;
+                                }
+                            }
+                        }
+                    ]
                     if root.details.has-poster: Image {
                         width: 100%;
                         height: 100%;
