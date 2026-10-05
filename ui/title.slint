@@ -458,19 +458,27 @@ export component TitleScreen inherits Rectangle {
             Rectangle {
                 visible: root.series;
                 height: root.series ? 50px : 0px;
-                tabs := Flickable {
-                    x: 40px;
-                    width: parent.width - 80px;
-                    content-width: max(self.width, root.seasons.length * 140px);
-                    interactive: false;
-                    HorizontalLayout {
-                        alignment: start;
-                        for season[i] in root.seasons: SeasonTab {
-                            item: season;
-                            selected: i == root.season-index;
-                            clicked => {
-                                root.select-season(i);
-                                keys.focus();
+                // The tabs take a sideways scroll themselves; a mouse wheel's
+                // up and down turns them sideways here.
+                TouchArea {
+                    scroll-event(event) => {
+                        tabs.content-x = max(tabs.width - tabs.content-width, min(0px, tabs.content-x + event.delta-y));
+                        accept
+                    }
+                    tabs := Flickable {
+                        x: 40px;
+                        width: parent.width - 80px;
+                        content-width: max(self.width, root.seasons.length * 140px);
+                        interactive: false;
+                        HorizontalLayout {
+                            alignment: start;
+                            for season[i] in root.seasons: SeasonTab {
+                                item: season;
+                                selected: i == root.season-index;
+                                clicked => {
+                                    root.select-season(i);
+                                    keys.focus();
+                                }
                             }
                         }
                     }
