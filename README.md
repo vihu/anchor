@@ -8,6 +8,10 @@ account: anchor shows your library and the catalogs of your addons, and
 plays every stream in your own `mpv`, so your `mpv.conf`, scripts (ModernZ,
 say), shaders and Dolby Vision handling (`vo=gpu-next`) apply untouched.
 
+## Demo
+
+https://github.com/user-attachments/assets/cb0c4f77-eb7a-4298-b0d1-33716024b861
+
 ## Design
 
 - anchor draws no video. Each stream opens in the mpv installed on your
@@ -26,8 +30,6 @@ say), shaders and Dolby Vision handling (`vo=gpu-next`) apply untouched.
 - The login key lives in the system keychain (Secret Service on Linux,
   Keychain on macOS), never in a file or a log. Addon and stream URLs,
   which carry keys, are never logged or shown.
-
-Status: 0.1.0, not released yet (changes in `CHANGELOG.md`).
 
 ## What it does
 
