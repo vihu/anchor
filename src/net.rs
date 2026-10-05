@@ -72,6 +72,20 @@ impl Client {
         let mut response = self.agent.post(url).send_json(body).map_err(Error::from)?;
         read(response.body_mut())
     }
+
+    /// Fetches `url` and reads its body, failing past `max_bytes`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] when the request fails or the body is larger.
+    pub fn bytes(&self, url: &str, max_bytes: u64) -> Result<Vec<u8>> {
+        let mut response = self.agent.get(url).call()?;
+        Ok(response
+            .body_mut()
+            .with_config()
+            .limit(max_bytes)
+            .read_to_vec()?)
+    }
 }
 
 impl Default for Client {
@@ -94,6 +108,9 @@ impl From<ureq::Error> for Error {
                 Error::Other("too many redirects".to_owned())
             }
             ureq::Error::BodyExceedsLimit(_) => Error::Other("the answer is too large".to_owned()),
+            ureq::Error::BadUri(_) | ureq::Error::Http(_) => {
+                Error::Other("not a valid URL".to_owned())
+            }
             // These can hold the URL, so say only what kind of failure.
             _ => Error::Other("the request failed".to_owned()),
         }

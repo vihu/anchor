@@ -347,11 +347,12 @@ fn short_name(name: &str) -> String {
     }
 }
 
-/// The host of an addon's URL, without the path: the path can hold the
-/// addon's configuration.
+/// The host of an addon's URL, without the path or any user and password:
+/// the rest can hold the addon's configuration.
 fn host(url: &str) -> &str {
     let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
-    rest.split(['/', '?', '#']).next().unwrap_or_default()
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    authority.rsplit('@').next().unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -372,6 +373,11 @@ mod tests {
             host("http://127.0.0.1:8099/meta/manifest.json"),
             "127.0.0.1:8099"
         );
+        assert_eq!(
+            host("https://user:key@aio.example.net/manifest.json"),
+            "aio.example.net"
+        );
+        assert_eq!(host("https://aio.example.net?k=v@x"), "aio.example.net");
     }
 
     #[test]

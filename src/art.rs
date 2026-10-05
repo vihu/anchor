@@ -9,19 +9,16 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::io::Read;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
 
+use anchor::net::Client;
 use camino::{Utf8Path, Utf8PathBuf};
 use slint::{Image, Rgb8Pixel, Rgba8Pixel, SharedPixelBuffer};
 
 /// Parallel downloads and decodes.
 const WORKERS: usize = 4;
-/// Per-picture timeout.
-const TIMEOUT: Duration = Duration::from_secs(15);
 /// Largest picture accepted, in bytes.
 const MAX_BYTES: u64 = 8 * 1024 * 1024;
 /// Extensions kept from the URL, so a cached file is named for what it is.
@@ -65,18 +62,15 @@ impl Art {
         let (queue, requests) = mpsc::channel::<(String, Size)>();
         let requests = Arc::new(Mutex::new(requests));
         let done = Arc::new(done);
-        let agent: ureq::Agent = ureq::Agent::config_builder()
-            .timeout_global(Some(TIMEOUT))
-            .build()
-            .into();
+        let client = Client::new();
         for _ in 0..WORKERS {
-            let (requests, done, agent, dir) = (
+            let (requests, done, client, dir) = (
                 Arc::clone(&requests),
                 Arc::clone(&done),
-                agent.clone(),
+                client.clone(),
                 dir.clone(),
             );
-            thread::spawn(move || work(&requests, &agent, &dir, &*done));
+            thread::spawn(move || work(&requests, &client, &dir, &*done));
         }
         Self {
             queue,
@@ -125,7 +119,7 @@ impl Picture {
 
 fn work(
     requests: &Mutex<Receiver<(String, Size)>>,
-    agent: &ureq::Agent,
+    client: &Client,
     dir: &Utf8Path,
     done: &(dyn Fn(String, Size, Option<Picture>) + Send + Sync),
 ) {
@@ -138,24 +132,17 @@ fn work(
         let path = if cached.exists() {
             Some(cached)
         } else {
-            download(agent, dir, &url, MAX_BYTES)
+            download(client, dir, &url)
         };
         let picture = path.and_then(|p| decode(&p, size));
         done(url, size, picture);
     }
 }
 
-/// Downloads `url` into the cache, reading at most `max_bytes`; `None` on
-/// any failure.
-fn download(agent: &ureq::Agent, dir: &Utf8Path, url: &str, max_bytes: u64) -> Option<Utf8PathBuf> {
-    let mut response = agent.get(url).call().ok()?;
-    let mut bytes = Vec::new();
-    response
-        .body_mut()
-        .as_reader()
-        .take(max_bytes)
-        .read_to_end(&mut bytes)
-        .ok()?;
+/// Downloads `url` into the cache; `None` on any failure, or when the
+/// picture is larger than `MAX_BYTES`.
+fn download(client: &Client, dir: &Utf8Path, url: &str) -> Option<Utf8PathBuf> {
+    let bytes = client.bytes(url, MAX_BYTES).ok()?;
     if bytes.is_empty() {
         return None;
     }
