@@ -10,6 +10,8 @@ say), shaders and Dolby Vision handling (`vo=gpu-next`) apply untouched.
 
 ## Demo
 
+https://github.com/user-attachments/assets/cb0c4f77-eb7a-4298-b0d1-33716024b861
+
 ## Design
 
 - anchor draws no video. Each stream opens in the mpv installed on your
