@@ -1,11 +1,13 @@
 // The page of a movie or a series: backdrop (or the poster), title,
-// metadata, plot, credits, Play and Mark watched; a series adds season tabs
-// and its episodes. Layout: .ai-docs/mockups/05-movie.html, 06-series.html.
+// metadata, plot, credits, Play and Mark watched; a movie adds its cast and
+// details below, a series its season tabs and episodes. Layout:
+// .ai-docs/mockups/05-movie-details.html, 06-series.html.
 
 import { ListView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
 import { Button, ButtonKind, Hint } from "atoms.slint";
-import { EpisodeItem, SeasonItem, StreamItem, TitleDetails } from "models.slint";
+import { CastItem, EpisodeItem, SeasonItem, StreamItem, TitleDetails } from "models.slint";
+import { MovieDetails } from "details.slint";
 import { StreamsPanel } from "streams.slint";
 import { NowBar, NowPlaying } from "nowplaying.slint";
 
@@ -157,6 +159,8 @@ export component TitleScreen inherits Rectangle {
     in property <int> season-index;
     in property <[EpisodeItem]> episodes;
     in-out property <int> episode-index;
+    // A movie's cast, shown below with its details.
+    in property <[CastItem]> cast;
     // The streams panel: open, its rows, the selected one, a note while it
     // loads, and a banner when playing failed.
     in-out property <bool> streams-open;
@@ -201,6 +205,7 @@ export component TitleScreen inherits Rectangle {
     }
 
     property <length> hero-height: 400px;
+    property <bool> has-details: !root.series && (root.cast.length > 0 || root.details.facts.length > 0 || root.details.awards != "");
     property <bool> has-episode: root.series && root.episode-index >= 0 && root.episode-index < root.episodes.length;
     property <EpisodeItem> episode: root.has-episode ? root.episodes[root.episode-index] : { progress: -1 };
     // A series' buttons follow the selected episode.
@@ -296,6 +301,10 @@ export component TitleScreen inherits Rectangle {
                     }
                     // Two stops: a stop between them draws a seam in Slint's
                     // software renderer.
+                    // A movie's larger type sits further over the picture.
+                    if !root.series: Rectangle {
+                        background: #0b0c104d;
+                    }
                     Rectangle {
                         background: @linear-gradient(90deg, Theme.bg 0%, #0b0c1000 60%);
                     }
@@ -321,42 +330,65 @@ export component TitleScreen inherits Rectangle {
                 }
                 VerticalLayout {
                     x: 48px;
-                    width: min(620px, parent.width * 0.52);
+                    width: root.series ? min(620px, parent.width * 0.52) : min(700px, parent.width * 0.56);
                     height: self.preferred-height;
-                    y: parent.height - self.height - (root.series ? 28px : 56px);
+                    y: parent.height - self.height - (root.series || root.has-details ? 28px : 56px);
                     spacing: 12px;
                     Text {
                         text: root.details.title;
                         color: Theme.text;
-                        font-size: Theme.fs-4xl;
+                        font-size: root.series ? Theme.fs-4xl : Theme.fs-5xl;
                         font-weight: 800;
                         wrap: word-wrap;
                     }
                     HorizontalLayout {
                         alignment: start;
-                        spacing: 12px;
+                        spacing: root.series ? 12px : 16px;
                         if root.details.meta != "": Text {
                             text: root.details.meta;
                             color: Theme.text-2;
-                            font-size: Theme.fs-md;
+                            font-size: root.series ? Theme.fs-md : Theme.fs-lg;
                             font-weight: 500;
                             vertical-alignment: center;
                         }
+                        if root.details.cert != "": VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: cert.preferred-width + 14px;
+                                height: 24px;
+                                border-width: 1px;
+                                border-color: Theme.text-3;
+                                border-radius: 5px;
+                                cert := Text {
+                                    text: root.details.cert;
+                                    color: Theme.text-2;
+                                    font-size: Theme.fs-sm;
+                                    font-weight: 700;
+                                }
+                            }
+                        }
                         if root.details.rating != "": HorizontalLayout {
-                            spacing: 5px;
+                            spacing: 6px;
                             VerticalLayout {
                                 alignment: center;
                                 Image {
                                     source: @image-url("icons/star.svg");
-                                    width: 15px;
-                                    height: 15px;
+                                    width: root.series ? 15px : 18px;
+                                    height: self.width;
                                     colorize: Theme.accent;
                                 }
                             }
                             Text {
                                 text: root.details.rating;
                                 color: Theme.text;
-                                font-size: Theme.fs-md;
+                                font-size: root.series ? Theme.fs-md : Theme.fs-lg;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: "IMDb";
+                                color: Theme.text-3;
+                                font-size: Theme.fs-sm;
                                 font-weight: 600;
                                 vertical-alignment: center;
                             }
@@ -365,10 +397,10 @@ export component TitleScreen inherits Rectangle {
                     if root.details.plot != "": Text {
                         text: root.details.plot;
                         color: Theme.text-2;
-                        font-size: Theme.fs-md;
+                        font-size: root.series ? Theme.fs-md : Theme.fs-lg;
                         wrap: word-wrap;
                         overflow: elide;
-                        max-height: root.series ? 66px : 120px;
+                        max-height: root.series ? 66px : 100px;
                     }
                     if root.details.credits != "": Text {
                         text: root.details.credits;
@@ -454,6 +486,12 @@ export component TitleScreen inherits Rectangle {
                         }
                     }
                 }
+            }
+            if root.has-details: MovieDetails {
+                vertical-stretch: 0;
+                cast: root.cast;
+                facts: root.details.facts;
+                awards: root.details.awards;
             }
             Rectangle {
                 visible: root.series;

@@ -15,8 +15,10 @@ through your own mpv.
   as you scroll. Ctrl+Up and Ctrl+Down step through the catalogs.
 - Search at the top of every screen, across every catalog that can search,
   with results as you type.
-- Movie and series pages: seasons, episodes, watched marks (Stremio's
-  watched bitfield), the next episode selected, Mark watched.
+- Movie and series pages. A movie shows its cast (with photos from
+  AIOMetadata), certification, director, writers, release date, country
+  and awards; a series its seasons, episodes, watched marks (Stremio's
+  watched bitfield), the next episode selected. Mark watched.
 - Streams: every stream addon's answer as it wrote it, the stream played
   last selected, torrents left out, why mpv could not play one.
 - Playing: your mpv at the resume point, with addon subtitles in the

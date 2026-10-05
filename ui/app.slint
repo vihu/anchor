@@ -12,9 +12,9 @@ import { HomeScreen } from "home.slint";
 import { CatalogScreen } from "catalog.slint";
 import { TitleScreen } from "title.slint";
 import { SettingsData, SettingsScreen } from "settings.slint";
-import { AddonItem, CardItem, CatalogLink, EpisodeItem, Fact, HeroItem, PosterItem, RowItem, SeasonItem, SectionItem, StreamItem, TitleDetails } from "models.slint";
+import { AddonItem, CardItem, CastItem, CatalogLink, EpisodeItem, Fact, HeroItem, PosterItem, RowItem, SeasonItem, SectionItem, StreamItem, TitleDetails } from "models.slint";
 
-export { Shell, SearchData, SettingsData, NowPlaying, AddonItem, CardItem, CatalogLink, EpisodeItem, Fact, HeroItem, PosterItem, RowItem, SearchItem, SeasonItem, SectionItem, StreamItem, TitleDetails }
+export { Shell, SearchData, SettingsData, NowPlaying, AddonItem, CardItem, CastItem, CatalogLink, EpisodeItem, Fact, HeroItem, PosterItem, RowItem, SearchItem, SeasonItem, SectionItem, StreamItem, TitleDetails }
 
 export enum Screen { login, home, catalog, search, title, settings }
 
@@ -62,6 +62,7 @@ export component AppWindow inherits Window {
     in property <[SeasonItem]> title-seasons;
     in property <int> title-season-index;
     in property <[EpisodeItem]> title-episodes;
+    in property <[CastItem]> title-cast;
     in-out property <int> title-episode-index;
     callback title-play <=> title.play;
     callback title-restart <=> title.restart;
@@ -233,6 +234,7 @@ export component AppWindow inherits Window {
                 seasons: root.title-seasons;
                 season-index: root.title-season-index;
                 episodes: root.title-episodes;
+                cast: root.title-cast;
                 episode-index <=> root.title-episode-index;
                 streams-open <=> root.streams-open;
                 streams-subtitle: root.streams-subtitle;

@@ -4,16 +4,17 @@
 
 use std::rc::Rc;
 
-use anchor::addon::{MetaItem, MetaPreview, Video};
+use anchor::addon::{CastMember, MetaItem, MetaPreview, Video};
 use anchor::library::{self, LibraryItem};
 use jiff::Timestamp;
 use slint::{Image, Model, ModelRc, SharedString, VecModel};
 
+use super::details::{cast, cast_item, facts};
 use super::streams::{Target, label};
 use super::{Session, State};
 use crate::art::Size;
 use crate::text;
-use crate::ui::{EpisodeItem, Screen, SeasonItem, TitleDetails};
+use crate::ui::{CastItem, EpisodeItem, Screen, SeasonItem, TitleDetails};
 
 /// Cast members named on a page.
 const CAST: usize = 3;
@@ -28,9 +29,14 @@ pub(super) struct Page {
     /// The episodes of the season showing, in order.
     episodes: Vec<Video>,
     episode_model: Rc<VecModel<EpisodeItem>>,
+    /// A movie's cast, a row each.
+    cast: Vec<CastMember>,
+    cast_model: Rc<VecModel<CastItem>>,
     /// Where the back button goes, and what it says.
     origin: (Screen, String),
+    /// The pictures asked for, so a refresh keeps what already shows.
     backdrop: Option<String>,
+    poster: Option<String>,
 }
 
 impl Page {
@@ -120,8 +126,11 @@ impl Session {
             season: 0,
             episodes: Vec::new(),
             episode_model: Rc::default(),
+            cast: Vec::new(),
+            cast_model: Rc::default(),
             origin: origin.clone(),
             backdrop: None,
+            poster: None,
         });
         app.set_back_label(origin.1.as_str().into());
         app.set_title_episode_index(-1);
@@ -248,11 +257,21 @@ impl Session {
                 details.has_backdrop = true;
                 app.set_title_details(details);
             }
-            Size::Poster if page.preview.poster.as_deref() == Some(url) => {
+            Size::Poster if page.poster.as_deref() == Some(url) => {
                 let mut details = app.get_title_details();
                 details.poster = image.clone();
                 details.has_poster = true;
                 app.set_title_details(details);
+            }
+            Size::Face => {
+                for (i, person) in page.cast.iter().enumerate() {
+                    if person.photo.as_deref() == Some(url) {
+                        let mut item = page.cast_model.row_data(i).expect("a row per person");
+                        item.photo = image.clone();
+                        item.has_photo = true;
+                        page.cast_model.set_row_data(i, item);
+                    }
+                }
             }
             Size::Still => {
                 for (i, video) in page.episodes.iter().enumerate() {
@@ -274,7 +293,7 @@ impl Session {
         let Some(app) = self.app.upgrade() else {
             return;
         };
-        let (details, series, urls) = {
+        let (details, series, urls, cast) = {
             let mut state = self.state.borrow_mut();
             let library = state.library.clone();
             let Some(page) = state.page.as_mut() else {
@@ -292,6 +311,23 @@ impl Session {
             let current = app.get_title_details();
             let same_backdrop = backdrop.is_some() && backdrop == page.backdrop;
             page.backdrop.clone_from(&backdrop);
+            let same_poster = poster.is_some() && poster == page.poster;
+            page.poster.clone_from(&poster);
+            // A movie shows its cast and details below; the credits
+            // line names them otherwise.
+            let movie = !series && preview.kind == "movie";
+            let facts = if movie { facts(preview) } else { Vec::new() };
+            let awards = preview.awards.clone().filter(|_| movie).unwrap_or_default();
+            let people = if movie { cast(preview) } else { Vec::new() };
+            let below = !facts.is_empty() || !awards.is_empty() || !people.is_empty();
+            let photos = if people == page.cast {
+                Vec::new()
+            } else {
+                page.cast_model
+                    .set_vec(people.iter().map(cast_item).collect::<Vec<_>>());
+                page.cast = people;
+                page.cast.iter().filter_map(|p| p.photo.clone()).collect()
+            };
             let resume = meta
                 .filter(|_| !series)
                 .and_then(|m| item.and_then(|i| i.resume_at(&m.movie_video_id())));
@@ -300,10 +336,26 @@ impl Session {
                 meta: meta_line(preview, meta, series).into(),
                 rating: preview.rating().unwrap_or_default().into(),
                 plot: preview.description.as_deref().unwrap_or_default().into(),
-                credits: credits(preview).into(),
+                credits: if below {
+                    SharedString::new()
+                } else {
+                    credits(preview).into()
+                },
+                cert: preview
+                    .app_extras
+                    .certification
+                    .as_deref()
+                    .unwrap_or_default()
+                    .into(),
+                facts: ModelRc::new(VecModel::from(facts)),
+                awards: awards.into(),
                 tint: text::tint(&preview.id),
-                poster: current.poster.clone(),
-                has_poster: current.has_poster && poster.is_some(),
+                poster: if same_poster {
+                    current.poster
+                } else {
+                    Image::default()
+                },
+                has_poster: same_poster && current.has_poster,
                 backdrop: if same_backdrop {
                     current.backdrop
                 } else {
@@ -331,13 +383,17 @@ impl Session {
             };
             let urls = (
                 backdrop.filter(|_| !same_backdrop),
-                poster.filter(|_| !current.has_poster),
+                poster.filter(|_| !same_poster),
             );
-            (details, series, urls)
+            (details, series, urls, (Rc::clone(&page.cast_model), photos))
         };
         app.set_title_details(details);
         app.set_title_series(series);
+        app.set_title_cast(ModelRc::from(cast.0));
         let mut art = self.art.borrow_mut();
+        for url in &cast.1 {
+            art.request(url, Size::Face);
+        }
         if let Some(url) = urls.0 {
             art.request(&url, Size::Backdrop);
         }

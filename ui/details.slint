@@ -1,0 +1,158 @@
+// A movie's cast and details, below its title. Layout:
+// .ai-docs/mockups/05-movie-details.html.
+
+import { Theme } from "theme.slint";
+import { CastItem, Fact } from "models.slint";
+
+component CastCard inherits VerticalLayout {
+    in property <CastItem> item;
+    width: 104px;
+    HorizontalLayout {
+        alignment: center;
+        padding-bottom: 10px;
+        Rectangle {
+            width: 88px;
+            height: 88px;
+            border-radius: 44px;
+            clip: true;
+            background: Theme.surface-3;
+            if root.item.has-photo: Image {
+                width: 100%;
+                height: 100%;
+                source: root.item.photo;
+                image-fit: cover;
+            }
+            if !root.item.has-photo: Text {
+                text: root.item.initials;
+                color: Theme.text-2;
+                font-size: Theme.fs-lg;
+                font-weight: 700;
+            }
+        }
+    }
+    Text {
+        text: root.item.name;
+        color: Theme.text;
+        font-size: Theme.fs-md;
+        font-weight: 600;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+    Text {
+        text: root.item.role;
+        color: Theme.text-3;
+        font-size: Theme.fs-sm;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+}
+
+export component MovieDetails inherits HorizontalLayout {
+    in property <[CastItem]> cast;
+    in property <[Fact]> facts;
+    in property <string> awards;
+    // Facts sit in two columns, a row each 58px.
+    property <length> fact-row: 58px;
+
+    padding-left: 48px;
+    padding-right: 48px;
+    padding-top: 8px;
+    padding-bottom: 32px;
+    spacing: 64px;
+    VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: start;
+        spacing: 16px;
+        if root.cast.length > 0: HorizontalLayout {
+            alignment: start;
+            spacing: 10px;
+            Text {
+                text: "Cast";
+                color: Theme.text;
+                font-size: Theme.fs-md;
+                font-weight: 700;
+            }
+            Text {
+                text: root.cast.length;
+                color: Theme.text-3;
+                font-size: Theme.fs-sm;
+                vertical-alignment: center;
+            }
+        }
+        if root.cast.length > 0: Rectangle {
+            height: 136px;
+            // Like the season tabs: a sideways scroll, or the wheel's up and down.
+            TouchArea {
+                scroll-event(event) => {
+                    people.content-x = max(people.width - people.content-width, min(0px, people.content-x + event.delta-y));
+                    accept
+                }
+                people := Flickable {
+                    content-width: max(self.width, root.cast.length * 118px - 14px);
+                    interactive: false;
+                    HorizontalLayout {
+                        alignment: start;
+                        spacing: 14px;
+                        for person in root.cast: CastCard {
+                            item: person;
+                        }
+                    }
+                }
+            }
+            // More past the edge.
+            if people.content-x > people.width - people.content-width: Rectangle {
+                x: parent.width - self.width;
+                width: 64px;
+                background: @linear-gradient(90deg, #0b0c1000 0%, Theme.bg 100%);
+            }
+        }
+    }
+    if root.facts.length > 0 || root.awards != "": VerticalLayout {
+        width: 360px;
+        alignment: start;
+        spacing: 16px;
+        Text {
+            text: "Details";
+            color: Theme.text;
+            font-size: Theme.fs-md;
+            font-weight: 700;
+        }
+        Rectangle {
+            height: (ceil(root.facts.length / 2) + (root.awards != "" ? 1 : 0)) * root.fact-row;
+            for fact[i] in root.facts: VerticalLayout {
+                x: mod(i, 2) * (parent.width + 28px) / 2;
+                y: floor(i / 2) * root.fact-row;
+                width: (parent.width - 28px) / 2;
+                height: self.preferred-height;
+                spacing: 2px;
+                Text {
+                    text: fact.label;
+                    color: Theme.text-3;
+                    font-size: Theme.fs-sm;
+                }
+                Text {
+                    text: fact.value;
+                    color: Theme.text;
+                    font-size: Theme.fs-md;
+                    overflow: elide;
+                }
+            }
+            if root.awards != "": VerticalLayout {
+                y: ceil(root.facts.length / 2) * root.fact-row;
+                height: self.preferred-height;
+                spacing: 2px;
+                Text {
+                    text: "Awards";
+                    color: Theme.text-3;
+                    font-size: Theme.fs-sm;
+                }
+                Text {
+                    text: root.awards;
+                    color: Theme.text;
+                    font-size: Theme.fs-md;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}

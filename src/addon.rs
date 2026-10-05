@@ -170,6 +170,42 @@ pub struct MetaPreview {
     /// Hints, for example the video a movie plays.
     #[serde(default)]
     pub behavior_hints: MetaHints,
+    /// When it came out, as ISO 8601.
+    #[serde(default, deserialize_with = "text_or_number")]
+    pub released: Option<String>,
+    /// For example `United Kingdom, United States`; TVDB sends `usa`.
+    #[serde(default, deserialize_with = "text_or_number")]
+    pub country: Option<String>,
+    /// For example `Won 4 Oscars. 160 wins & 220 nominations total`.
+    #[serde(default, deserialize_with = "text_or_number")]
+    pub awards: Option<String>,
+    /// What AIOMetadata adds: the cast with pictures, the certification.
+    #[serde(default, rename = "app_extras", deserialize_with = "or_default")]
+    pub app_extras: AppExtras,
+}
+
+/// What AIOMetadata adds to a title.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct AppExtras {
+    /// The cast, with their parts and pictures.
+    #[serde(default, deserialize_with = "lenient_list")]
+    pub cast: Vec<CastMember>,
+    /// For example `PG-13`.
+    #[serde(default, deserialize_with = "text_or_number")]
+    pub certification: Option<String>,
+}
+
+/// Someone in a title's cast.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct CastMember {
+    /// For example `Teo Larsen`.
+    pub name: String,
+    /// Their part, for example `Bramble`.
+    #[serde(default)]
+    pub character: Option<String>,
+    /// Their picture's URL.
+    #[serde(default)]
+    pub photo: Option<String>,
 }
 
 /// A link on a title: a cast member, a director, a genre, a rating.
@@ -674,6 +710,16 @@ fn text_or_number<'de, D: serde::Deserializer<'de>>(
     })
 }
 
+/// The value, or its default when it is not the shape expected: an odd
+/// extra must not cost the whole title.
+fn or_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned + Default,
+{
+    Ok(serde_json::from_value(Value::deserialize(deserializer)?).unwrap_or_default())
+}
+
 fn lenient_list<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -916,6 +962,38 @@ mod tests {
             videos: vec![],
         };
         assert_eq!(bare.movie_video_id(), "tt9");
+    }
+
+    #[test]
+    fn aiometadata_extras_read_and_odd_ones_cost_nothing() {
+        let preview: MetaPreview = serde_json::from_value(serde_json::json!({
+            "id": "tt1", "type": "movie", "name": "X",
+            "country": "Netherlands", "released": "2025-03-14T00:00:00.000Z",
+            "app_extras": {
+                "certification": "PG",
+                "cast": [
+                    {"name": "Teo Larsen", "character": "Bramble", "photo": "https://image.example/t.jpg"},
+                    {"name": "Margit Holm", "character": "Wren", "photo": null},
+                    {"character": "nameless"}
+                ]
+            }
+        }))
+        .unwrap();
+        assert_eq!(preview.app_extras.certification.as_deref(), Some("PG"));
+        assert_eq!(
+            preview.app_extras.cast.len(),
+            2,
+            "one without a name is left out"
+        );
+        assert_eq!(preview.app_extras.cast[1].photo, None);
+        assert_eq!(preview.country.as_deref(), Some("Netherlands"));
+
+        let odd: MetaPreview = serde_json::from_value(serde_json::json!({
+            "id": "tt1", "type": "movie", "country": ["usa"], "app_extras": "none"
+        }))
+        .unwrap();
+        assert!(odd.app_extras.cast.is_empty());
+        assert_eq!(odd.country, None);
     }
 
     #[test]

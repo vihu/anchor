@@ -33,6 +33,8 @@ pub enum Size {
     Backdrop,
     /// An episode still or a card's picture, 16:9.
     Still,
+    /// A cast member's face, shown in an 88px circle.
+    Face,
 }
 
 /// A decoded picture, ready to become a Slint image on the UI thread.
@@ -102,6 +104,7 @@ impl Size {
             Size::Poster => (320, 480),
             Size::Backdrop => (1600, 900),
             Size::Still => (600, 338),
+            Size::Face => (176, 224),
         }
     }
 }

@@ -138,6 +138,8 @@ impl Session {
                     app.set_home_hero(hero);
                 }
             }
+            // Home shows no cast.
+            Size::Face => {}
         }
     }
 

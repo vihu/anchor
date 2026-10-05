@@ -8,6 +8,7 @@
 
 mod account;
 mod catalog;
+mod details;
 mod home;
 mod playing;
 mod search;

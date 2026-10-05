@@ -68,6 +68,12 @@ export struct SearchItem {
     has-poster: bool,
 }
 
+// One "label: value" fact, in Settings and on a movie's page.
+export struct Fact {
+    label: string,
+    value: string,
+}
+
 // The page of a movie or a series.
 export struct TitleDetails {
     title: string,
@@ -75,8 +81,14 @@ export struct TitleDetails {
     meta: string,
     rating: string,
     plot: string,
-    // For example "Directed by Ana Dimas · With Teo Larsen, Margit Holm".
+    // For example "Directed by Ana Dimas · With Teo Larsen, Margit Holm";
+    // a movie with details below shows none.
     credits: string,
+    // For example "PG-13".
+    cert: string,
+    // A movie's details: who made it, when, where; then its awards.
+    facts: [Fact],
+    awards: string,
     tint: color,
     poster: image,
     has-poster: bool,
@@ -93,6 +105,17 @@ export struct TitleDetails {
     watched: bool,
     // Playing in mpv now.
     playing: bool,
+}
+
+// Someone in a movie's cast.
+export struct CastItem {
+    name: string,
+    // Their part, for example "Bramble".
+    role: string,
+    // Shown without a picture, for example "TL".
+    initials: string,
+    photo: image,
+    has-photo: bool,
 }
 
 // A season tab.
@@ -133,12 +156,6 @@ export struct StreamItem {
     // For example "Last used" or "Failed".
     tag: string,
     failed: bool,
-}
-
-// One "label: value" fact in Settings.
-export struct Fact {
-    label: string,
-    value: string,
 }
 
 // An addon in Settings.

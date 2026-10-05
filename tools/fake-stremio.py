@@ -66,6 +66,11 @@ SERIES = [
     ("Rookery", 2023, "7.3", "Crime", "Comedy", [6, 6]),
     ("High Pasture", 2025, "6.8", "Adventure", "Drama", [8]),
 ]
+CAST = [
+    ("Teo Larsen", "Bramble"), ("Margit Holm", "Wren"), ("Sami Okafor", "Frank"), ("Lena Ruiz", "Rinky"),
+    ("Odile Brandt", "Gimera"), ("Jonas Pihl", "Old Thistle"), ("Kofi Mensah", "Burdock"),
+    ("Mira Solberg", "Twig"), ("Ruth Aalto", "Hazel"), ("Ines Varga", "Narrator"),
+]
 PLOTS = [
     "When the spring floods reach the old warren, a stubborn rabbit leads three unlikely neighbours on a long dig to higher ground.",
     "Three woodland rodents run the most ambitious heist crew in the valley. Their only problem is the rabbit next door.",
@@ -99,8 +104,20 @@ class Content:
             "background": self.picture("still", i), "description": PLOTS[i % len(PLOTS)],
             "releaseInfo": str(year), "runtime": f"{minutes} min", "genres": genres, "imdbRating": rating,
             "links": [{"name": "Ana Dimas", "category": "Directors", "url": "stremio:///x"},
+                      {"name": "Ana Dimas", "category": "Writers", "url": "stremio:///x"},
+                      {"name": "Ines Varga", "category": "Writers", "url": "stremio:///x"},
                       {"name": "Teo Larsen", "category": "Cast", "url": "stremio:///x"},
                       {"name": "Margit Holm", "category": "Cast", "url": "stremio:///x"}],
+            "released": f"{year}-03-14T00:00:00.000Z", "country": "Netherlands",
+            # Cinemeta sends awards; AIOMetadata the cast with pictures and
+            # the certification.
+            **({"awards": "2 wins and 5 nominations"} if i % 2 == 0 else {}),
+            "app_extras": {
+                "certification": "PG",
+                "cast": [{"name": name, "character": part,
+                          "photo": None if k == 5 else self.picture("poster", i + k)}
+                         for k, (name, part) in enumerate(CAST)],
+            },
             "behaviorHints": {"defaultVideoId": f"tt9{i:06d}", "hasScheduledVideos": False},
             "videos": [],
         }
